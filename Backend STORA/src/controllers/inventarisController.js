@@ -3,7 +3,7 @@ const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
 class InventarisController {
-  // Get all inventaris
+
   async getAllInventaris(req, res) {
     try {
       console.log('===== GET ALL INVENTARIS REQUEST =====');
@@ -22,8 +22,8 @@ class InventarisController {
       console.log(`Fetching page ${page}, limit ${limit}, offset ${offset}`);
 
       let whereClause = {};
-      
-      // Filter by user ID from JWT token
+
+
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
         console.log(`Filtering by user ID: ${req.user.id}`);
@@ -31,7 +31,7 @@ class InventarisController {
         console.log('WARNING: No user ID found in request!');
       }
       console.log('Where clause:', JSON.stringify(whereClause));
-      
+
       if (search) {
         whereClause[Op.or] = [
           { Nama_Barang: { [Op.like]: `%${search}%` } },
@@ -89,21 +89,21 @@ class InventarisController {
     }
   }
 
-  // Get inventaris by ID
+
   async getInventarisById(req, res) {
     try {
       const { id } = req.params;
-      
-      // Build where clause with user ID filter
-      const whereClause = { 
-        ID_Inventaris: id 
+
+
+      const whereClause = {
+        ID_Inventaris: id
       };
-      
-      // Filter by user ID from JWT token
+
+
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
-      
+
       const inventaris = await Inventaris.findOne({
         where: whereClause,
         include: [
@@ -137,7 +137,7 @@ class InventarisController {
     }
   }
 
-  // Create new inventaris
+
   async createInventaris(req, res) {
     try {
       console.log('===== CREATE INVENTARIS REQUEST =====');
@@ -157,14 +157,14 @@ class InventarisController {
 
       const inventarisData = req.body;
 
-      // Get user ID from JWT token (set by authMiddleware)
+
       inventarisData.ID_User = req.user.id;
 
       console.log('Data to be saved:', JSON.stringify(inventarisData, null, 2));
 
       const newInventaris = await Inventaris.create(inventarisData);
 
-      // Handle photo upload if exists
+
       if (req.file) {
         const photoPath = `/uploads/inventaris/${req.file.filename}`;
         await FotoInventaris.create({
@@ -175,7 +175,7 @@ class InventarisController {
         console.log('✓ Photo uploaded:', photoPath);
       }
 
-      // Fetch with associations
+
       const inventarisWithAssociations = await Inventaris.findByPk(
         newInventaris.ID_Inventaris,
         {
@@ -214,18 +214,18 @@ class InventarisController {
     }
   }
 
-  // Update inventaris
+
   async updateInventaris(req, res) {
     try {
       const { id } = req.params;
       const updateData = req.body;
 
-      // Build where clause with user ID filter for security
-      const whereClause = { 
-        ID_Inventaris: id 
+
+      const whereClause = {
+        ID_Inventaris: id
       };
-      
-      // Ensure user can only update their own items
+
+
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
@@ -269,21 +269,21 @@ class InventarisController {
     }
   }
 
-  // Delete inventaris
+
   async deleteInventaris(req, res) {
     try {
       const { id } = req.params;
-      
-      // Build where clause with user ID filter for security
-      const whereClause = { 
-        ID_Inventaris: id 
+
+
+      const whereClause = {
+        ID_Inventaris: id
       };
-      
-      // Ensure user can only delete their own items
+
+
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
-      
+
       const deletedRowsCount = await Inventaris.destroy({
         where: whereClause,
       });
@@ -307,15 +307,15 @@ class InventarisController {
     }
   }
 
-  // Get inventaris statistics
+
   async getInventarisStats(req, res) {
     try {
-      // Build where clause for user filter
+
       const whereClause = {};
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
-      
+
       const totalItems = await Inventaris.count({ where: whereClause });
       const itemsByKondisi = await Inventaris.findAll({
         attributes: [

@@ -28,7 +28,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         context = application
     )
 
-    // UI State
     private val _inventoryItems = MutableStateFlow<List<InventoryItem>>(emptyList())
     val inventoryItems: StateFlow<List<InventoryItem>> = _inventoryItems.asStateFlow()
 
@@ -59,7 +58,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Load inventory items from local database
     private fun loadInventoryItems() {
         viewModelScope.launch {
             try {
@@ -77,7 +75,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Search inventory items
     fun searchInventory(query: String) {
         _searchQuery.value = query
         viewModelScope.launch {
@@ -98,7 +95,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Get inventory item by ID
     suspend fun getInventoryItemById(id: String): InventoryItem? {
         return try {
             repository.getInventoryItemById(id)
@@ -108,7 +104,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Add new inventory item
     fun addInventoryItem(item: InventoryItem, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -138,7 +133,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Update inventory item
     fun updateInventoryItem(item: InventoryItem, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -168,7 +162,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Delete inventory item
     fun deleteInventoryItem(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -198,7 +191,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Sync data (full bidirectional sync)
     fun syncData() {
         if (_isSyncing.value) {
             Log.d(TAG, "Sync already in progress")
@@ -244,7 +236,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Sync to server only
     private fun syncToServer() {
         viewModelScope.launch {
             try {
@@ -258,7 +249,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Sync from server only
     fun syncFromServer() {
         viewModelScope.launch {
             try {
@@ -290,7 +280,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Update unsynced count
     private fun updateUnsyncedCount() {
         viewModelScope.launch {
             try {
@@ -303,7 +292,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Get total quantity
     suspend fun getTotalQuantity(): Int {
         return try {
             repository.getTotalQuantity()
@@ -313,7 +301,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Check if noinv exists
     suspend fun isNoinvExists(noinv: String): Boolean {
         return try {
             repository.isNoinvExists(noinv)
@@ -323,7 +310,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Filter by category
     fun filterByCategory(category: String) {
         viewModelScope.launch {
             try {
@@ -337,7 +323,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Filter by condition
     fun filterByCondition(condition: String) {
         viewModelScope.launch {
             try {
@@ -351,22 +336,18 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Clear error
     fun clearError() {
         _error.value = null
     }
 
-    // Clear sync status
     fun clearSyncStatus() {
         _syncStatus.value = null
     }
 
-    // Check online status
     fun isOnline(): Boolean {
         return repository.isOnline()
     }
 
-    // Refresh data
     fun refreshData() {
         loadInventoryItems()
         if (repository.isOnline()) {

@@ -28,17 +28,17 @@ class InventoryRepository(
 
     private val tokenManager = TokenManager.getInstance(context)
 
-    // Get auth token from TokenManager
+   
     private fun getAuthToken(): String? {
         return tokenManager.getToken()
     }
 
-    // Get user ID from TokenManager
+    
     private fun getUserId(): Int {
         return tokenManager.getUserId()
     }
 
-    // Helper function to convert URI to File
+   
     private fun uriToFile(uri: Uri): File? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
@@ -58,7 +58,7 @@ class InventoryRepository(
         }
     }
 
-    // Helper function to create MultipartBody.Part from photo URI
+    
     private fun createPhotoPart(photoUri: String?): MultipartBody.Part? {
         if (photoUri == null) return null
         
@@ -87,9 +87,7 @@ class InventoryRepository(
     }
 
 
-    // ==================== LOCAL OPERATIONS ====================
-
-    // Get all inventory items from local database for current user
+   
     fun getAllInventoryItems(): Flow<List<InventoryItem>> {
         val userId = getUserId()
         return if (userId != -1) {
@@ -99,14 +97,14 @@ class InventoryRepository(
         }
     }
 
-    // Get inventory item by ID
+    
     suspend fun getInventoryItemById(id: String): InventoryItem? {
         return withContext(Dispatchers.IO) {
             inventoryDao.getInventoryItemById(id)
         }
     }
 
-    // Search inventory items for current user
+    
     fun searchInventoryItems(query: String): Flow<List<InventoryItem>> {
         val userId = getUserId()
         return if (userId != -1) {
@@ -116,7 +114,7 @@ class InventoryRepository(
         }
     }
 
-    // Insert inventory item
+    
     suspend fun insertInventoryItem(item: InventoryItem): Result<InventoryItem> {
         return withContext(Dispatchers.IO) {
             try {
@@ -141,7 +139,7 @@ class InventoryRepository(
         }
     }
 
-    // Update inventory item
+    
     suspend fun updateInventoryItem(item: InventoryItem): Result<InventoryItem> {
         return withContext(Dispatchers.IO) {
             try {
@@ -166,7 +164,7 @@ class InventoryRepository(
         }
     }
 
-    // Delete inventory item (soft delete)
+    
     suspend fun deleteInventoryItem(id: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -180,7 +178,7 @@ class InventoryRepository(
         }
     }
 
-    // Get unsynced count for current user
+   
     suspend fun getUnsyncedCount(): Int {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -192,9 +190,7 @@ class InventoryRepository(
         }
     }
 
-    // ==================== SYNC OPERATIONS ====================
-
-    // Sync all data from server to local
+    
     suspend fun syncFromServer(): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
@@ -230,16 +226,16 @@ class InventoryRepository(
                         var syncedCount = 0
                         serverItems.forEach { apiModel ->
                             try {
-                                // Check if item already exists locally
+                                
                                 val existingItem = apiModel.idInventaris?.let {
                                     inventoryDao.getInventoryItemByServerId(it)
                                 }
 
                                 val localItem = if (existingItem != null) {
-                                    // Update existing item
+                                   
                                     apiModel.toInventoryItem(existingItem.id, userId)
                                 } else {
-                                    // Create new item
+                                    
                                     apiModel.toInventoryItem(userId = userId)
                                 }
 
@@ -270,7 +266,7 @@ class InventoryRepository(
         }
     }
 
-    // Sync local changes to server
+    
     suspend fun syncToServer(): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
@@ -294,7 +290,7 @@ class InventoryRepository(
                 var syncedCount = 0
                 var errorCount = 0
 
-                // Sync deleted items first
+                
                 deletedItems.forEach { item ->
                     try {
                         if (item.serverId != null) {
@@ -313,7 +309,7 @@ class InventoryRepository(
                                 errorCount++
                             }
                         } else {
-                            // Item was never synced to server, just delete locally
+                            
                             inventoryDao.deleteInventoryItem(item)
                             Log.d(TAG, "Local-only item deleted: ${item.name}")
                         }
@@ -323,7 +319,7 @@ class InventoryRepository(
                     }
                 }
 
-                // Sync create/update items
+                
                 unsyncedItems.filter { !it.isDeleted }.forEach { item ->
                     try {
                         val request = item.toApiRequest(userId)
@@ -331,7 +327,7 @@ class InventoryRepository(
                         Log.d(TAG, "Request data: $request")
 
                         if (item.serverId != null) {
-                            // Update existing item on server
+                            
                             Log.d(TAG, "Updating item on server: ${item.name}, serverId: ${item.serverId}")
                             val response = apiService.updateInventory(
                                 token = authHeader,
@@ -350,13 +346,13 @@ class InventoryRepository(
                                 errorCount++
                             }
                         } else {
-                            // Create new item on server
+                            
                             Log.d(TAG, "Creating new item on server: ${item.name}")
                             Log.d(TAG, "Has photo: ${item.photoUri != null}")
                             Log.d(TAG, "Auth header being sent: ${authHeader.take(30)}...")
                             
                             val response = if (item.photoUri != null) {
-                                // Upload dengan foto menggunakan multipart
+                               
                                 val fotoPart = createPhotoPart(item.photoUri)
                                 
                                 apiService.createInventoryWithPhoto(
@@ -372,7 +368,7 @@ class InventoryRepository(
                                     foto = fotoPart
                                 )
                             } else {
-                                // Upload tanpa foto menggunakan JSON
+                               
                                 apiService.createInventory(
                                     token = authHeader,
                                     inventoryRequest = request
@@ -412,7 +408,7 @@ class InventoryRepository(
                     }
                 }
 
-                // Clean up synced deleted items
+              
                 inventoryDao.deleteSyncedDeletedItems()
 
                 Log.d(TAG, "Sync to server completed: $syncedCount items synced, $errorCount errors")
@@ -430,7 +426,7 @@ class InventoryRepository(
         }
     }
 
-    // Full bidirectional sync
+    
     suspend fun performFullSync(): Result<Pair<Int, Int>> {
         return withContext(Dispatchers.IO) {
             try {
@@ -453,7 +449,6 @@ class InventoryRepository(
         }
     }
 
-    // Check if online (simple check)
     fun isOnline(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
             as? android.net.ConnectivityManager
@@ -461,7 +456,7 @@ class InventoryRepository(
         return activeNetwork?.isConnectedOrConnecting == true
     }
 
-    // Get total quantity for current user
+   
     suspend fun getTotalQuantity(): Int {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -473,7 +468,7 @@ class InventoryRepository(
         }
     }
 
-    // Get inventory by category for current user
+   
     fun getInventoryByCategory(category: String): Flow<List<InventoryItem>> {
         val userId = getUserId()
         return if (userId != -1) {
@@ -483,7 +478,7 @@ class InventoryRepository(
         }
     }
 
-    // Get inventory by condition for current user
+   
     fun getInventoryByCondition(condition: String): Flow<List<InventoryItem>> {
         val userId = getUserId()
         return if (userId != -1) {
@@ -493,7 +488,7 @@ class InventoryRepository(
         }
     }
 
-    // Check if noinv exists
+    
     suspend fun isNoinvExists(noinv: String): Boolean {
         return withContext(Dispatchers.IO) {
             inventoryDao.isNoinvExists(noinv) > 0
