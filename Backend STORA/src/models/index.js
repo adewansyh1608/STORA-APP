@@ -1,0 +1,94 @@
+const { sequelize } = require('../../config/db');
+
+// Import all models
+const User = require('./User');
+const Inventaris = require('./Inventaris');
+const FotoInventaris = require('./FotoInventaris');
+const Peminjaman = require('./Peminjaman');
+const PeminjamanBarang = require('./PeminjamanBarang');
+const FotoPeminjaman = require('./FotoPeminjaman');
+const Notifikasi = require('./Notifikasi');
+
+// Define associations
+
+// User <-> Inventaris (One-to-Many)
+User.hasMany(Inventaris, {
+  foreignKey: 'ID_User',
+  as: 'inventaris',
+});
+Inventaris.belongsTo(User, {
+  foreignKey: 'ID_User',
+  as: 'user',
+});
+
+// Inventaris <-> FotoInventaris (One-to-Many)
+Inventaris.hasMany(FotoInventaris, {
+  foreignKey: 'ID_Inventaris',
+  as: 'foto',
+});
+FotoInventaris.belongsTo(Inventaris, {
+  foreignKey: 'ID_Inventaris',
+  as: 'inventaris',
+});
+
+// User <-> Peminjaman (One-to-Many)
+User.hasMany(Peminjaman, {
+  foreignKey: 'ID_User',
+  as: 'peminjaman',
+});
+Peminjaman.belongsTo(User, {
+  foreignKey: 'ID_User',
+  as: 'user',
+});
+
+// Peminjaman <-> PeminjamanBarang (One-to-Many)
+Peminjaman.hasMany(PeminjamanBarang, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'barang',
+});
+PeminjamanBarang.belongsTo(Peminjaman, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'peminjaman',
+});
+
+// Inventaris <-> PeminjamanBarang (One-to-Many)
+Inventaris.hasMany(PeminjamanBarang, {
+  foreignKey: 'ID_Inventaris',
+  as: 'peminjaman_barang',
+});
+PeminjamanBarang.belongsTo(Inventaris, {
+  foreignKey: 'ID_Inventaris',
+  as: 'inventaris',
+});
+
+// Peminjaman <-> FotoPeminjaman (One-to-Many)
+Peminjaman.hasMany(FotoPeminjaman, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'foto',
+});
+FotoPeminjaman.belongsTo(Peminjaman, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'peminjaman',
+});
+
+// User <-> Notifikasi (One-to-Many)
+User.hasMany(Notifikasi, {
+  foreignKey: 'ID_User',
+  as: 'notifikasi',
+});
+Notifikasi.belongsTo(User, {
+  foreignKey: 'ID_User',
+  as: 'user',
+});
+
+// Export all models and sequelize instance
+module.exports = {
+  sequelize,
+  User,
+  Inventaris,
+  FotoInventaris,
+  Peminjaman,
+  PeminjamanBarang,
+  FotoPeminjaman,
+  Notifikasi,
+};
