@@ -1,0 +1,123 @@
+package com.example.stora.network
+
+import com.example.stora.data.AuthResponse
+import com.example.stora.data.LoginRequest
+import com.example.stora.data.SignupRequest
+import com.example.stora.data.UpdateProfileRequest
+import com.example.stora.data.InventoryApiResponse
+import com.example.stora.data.InventoryApiModel
+import com.example.stora.data.InventoryRequest
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import retrofit2.Response
+import retrofit2.http.*
+
+interface ApiService {
+
+    @POST("login")
+    suspend fun login(
+        @Body loginRequest: LoginRequest
+    ): Response<AuthResponse>
+
+    @POST("signup")
+    suspend fun signup(
+        @Body signupRequest: SignupRequest
+    ): Response<AuthResponse>
+
+    @POST("logout")
+    suspend fun logout(
+        @Header("Authorization") token: String
+    ): Response<AuthResponse>
+
+    @GET("profile")
+    suspend fun getProfile(
+        @Header("Authorization") token: String
+    ): Response<AuthResponse>
+
+    @PUT("profile")
+    suspend fun updateProfile(
+        @Header("Authorization") token: String,
+        @Body updateProfileRequest: UpdateProfileRequest
+    ): Response<AuthResponse>
+
+    // ==================== INVENTORY ENDPOINTS ====================
+
+    // Get all inventory items
+    @GET("inventaris")
+    suspend fun getAllInventory(
+        @Header("Authorization") token: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 100,
+        @Query("search") search: String? = null,
+        @Query("kategori") kategori: String? = null,
+        @Query("kondisi") kondisi: String? = null
+    ): Response<InventoryApiResponse<List<InventoryApiModel>>>
+
+    // Get inventory by ID
+    @GET("inventaris/{id}")
+    suspend fun getInventoryById(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<InventoryApiResponse<InventoryApiModel>>
+
+    // Create new inventory (JSON only - no photo)
+    @POST("inventaris")
+    suspend fun createInventory(
+        @Header("Authorization") token: String,
+        @Body inventoryRequest: InventoryRequest
+    ): Response<InventoryApiResponse<InventoryApiModel>>
+
+    // Create new inventory with photo (Multipart)
+    @Multipart
+    @POST("inventaris")
+    suspend fun createInventoryWithPhoto(
+        @Header("Authorization") token: String,
+        @Part("Nama_Barang") namaBarang: RequestBody,
+        @Part("Kode_Barang") kodeBarang: RequestBody,
+        @Part("Jumlah") jumlah: RequestBody,
+        @Part("Kategori") kategori: RequestBody,
+        @Part("Lokasi") lokasi: RequestBody,
+        @Part("Kondisi") kondisi: RequestBody,
+        @Part("Tanggal_Pengadaan") tanggalPengadaan: RequestBody,
+        @Part("Deskripsi") deskripsi: RequestBody?,
+        @Part foto: MultipartBody.Part?
+    ): Response<InventoryApiResponse<InventoryApiModel>>
+
+    // Update inventory
+    @PUT("inventaris/{id}")
+    suspend fun updateInventory(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body inventoryRequest: InventoryRequest
+    ): Response<InventoryApiResponse<InventoryApiModel>>
+
+    // Update inventory with photo (Multipart)
+    @Multipart
+    @PUT("inventaris/{id}")
+    suspend fun updateInventoryWithPhoto(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Part("Nama_Barang") namaBarang: RequestBody,
+        @Part("Kode_Barang") kodeBarang: RequestBody,
+        @Part("Jumlah") jumlah: RequestBody,
+        @Part("Kategori") kategori: RequestBody,
+        @Part("Lokasi") lokasi: RequestBody,
+        @Part("Kondisi") kondisi: RequestBody,
+        @Part("Tanggal_Pengadaan") tanggalPengadaan: RequestBody,
+        @Part("Deskripsi") deskripsi: RequestBody?,
+        @Part foto: MultipartBody.Part?
+    ): Response<InventoryApiResponse<InventoryApiModel>>
+
+    // Delete inventory
+    @DELETE("inventaris/{id}")
+    suspend fun deleteInventory(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<InventoryApiResponse<Any>>
+
+    // Get inventory statistics
+    @GET("inventaris/stats")
+    suspend fun getInventoryStats(
+        @Header("Authorization") token: String
+    ): Response<InventoryApiResponse<Any>>
+}
