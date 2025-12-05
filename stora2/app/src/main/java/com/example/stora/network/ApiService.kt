@@ -7,6 +7,10 @@ import com.example.stora.data.UpdateProfileRequest
 import com.example.stora.data.InventoryApiResponse
 import com.example.stora.data.InventoryApiModel
 import com.example.stora.data.InventoryRequest
+import com.example.stora.data.LoanApiResponse
+import com.example.stora.data.LoanApiModel
+import com.example.stora.data.LoanCreateRequest
+import com.example.stora.data.LoanStatusUpdateRequest
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
@@ -120,4 +124,45 @@ interface ApiService {
     suspend fun getInventoryStats(
         @Header("Authorization") token: String
     ): Response<InventoryApiResponse<Any>>
+
+    // ==================== PEMINJAMAN/LOAN ENDPOINTS ====================
+
+    // Get all peminjaman
+    @GET("peminjaman")
+    suspend fun getAllPeminjaman(
+        @Header("Authorization") token: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 100,
+        @Query("status") status: String? = null,
+        @Query("search") search: String? = null
+    ): Response<LoanApiResponse<List<LoanApiModel>>>
+
+    // Get peminjaman by ID
+    @GET("peminjaman/{id}")
+    suspend fun getPeminjamanById(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<LoanApiResponse<LoanApiModel>>
+
+    // Create new peminjaman
+    @POST("peminjaman")
+    suspend fun createPeminjaman(
+        @Header("Authorization") token: String,
+        @Body request: LoanCreateRequest
+    ): Response<LoanApiResponse<LoanApiModel>>
+
+    // Update peminjaman status
+    @PATCH("peminjaman/{id}/status")
+    suspend fun updatePeminjamanStatus(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body request: LoanStatusUpdateRequest
+    ): Response<LoanApiResponse<LoanApiModel>>
+
+    // Get peminjaman statistics
+    @GET("peminjaman/stats")
+    suspend fun getPeminjamanStats(
+        @Header("Authorization") token: String
+    ): Response<LoanApiResponse<Any>>
 }
+

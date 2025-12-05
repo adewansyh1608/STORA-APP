@@ -33,16 +33,20 @@ import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.stora.data.InventoryItem
 import com.example.stora.viewmodel.InventoryViewModel
+import com.example.stora.viewmodel.LoanViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.stora.data.LoansData
+import com.example.stora.repository.LoanItemInfo
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellow
 import com.example.stora.ui.theme.StoraYellowButton
 import com.example.stora.utils.FileUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
 
 data class LoanFormItem(
     val inventoryItem: InventoryItem,
@@ -55,20 +59,26 @@ data class LoanFormItem(
 fun LoanFormScreen(
     navController: NavHostController,
     selectedItemIds: List<String>,
-    inventoryViewModel: InventoryViewModel = viewModel()
+    inventoryViewModel: InventoryViewModel = viewModel(),
+    loanViewModel: LoanViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var isVisible by remember { mutableStateOf(false) }
     val inventoryItems by inventoryViewModel.inventoryItems.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val isLoading by loanViewModel.isLoading.collectAsState()
 
     // Form states
     var borrowerName by remember { mutableStateOf("") }
+    var borrowerPhone by remember { mutableStateOf("") }
     var borrowDate by remember { mutableStateOf("") }
     var returnDate by remember { mutableStateOf("") }
     var showBorrowDatePicker by remember { mutableStateOf(false) }
     var showReturnDatePicker by remember { mutableStateOf(false) }
     var selectedItemForPhoto by remember { mutableStateOf<Int?>(null) }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
 
     // Selected items with quantities
     val loanItems = remember(inventoryItems, selectedItemIds) {
@@ -226,6 +236,39 @@ fun LoanFormScreen(
                         onValueChange = { borrowerName = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Masukkan nama peminjam") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = StoraWhite,
+                            unfocusedContainerColor = StoraWhite,
+                            focusedIndicatorColor = StoraBlueDark,
+                            unfocusedIndicatorColor = Color(0xFFE0E0E0)
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Phone Number
+                    Text(
+                        text = "Nomor HP Peminjam",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = borrowerPhone,
+                        onValueChange = { borrowerPhone = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Masukkan nomor HP") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Phone,
+                                contentDescription = "Phone",
+                                tint = textGray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = StoraWhite,
@@ -446,20 +489,50 @@ fun LoanFormScreen(
                     // Save Button
                     Button(
                         onClick = {
-                            // Save each loan item
-                            loanItems.forEach { loanFormItem ->
-                                LoansData.addLoan(
-                                    name = loanFormItem.inventoryItem.name,
-                                    code = loanFormItem.inventoryItem.noinv,
-                                    quantity = loanFormItem.quantity,
-                                    borrower = borrowerName,
-                                    borrowDate = borrowDate,
-                                    returnDate = returnDate,
+                            // Prepare LoanItemInfo list for Room storage with individual images
+                            val loanItemInfos = loanItems.map { loanFormItem ->
+                                LoanItemInfo(
+                                    inventarisId = loanFormItem.inventoryItem.serverId ?: 0,
+                                    namaBarang = loanFormItem.inventoryItem.name,
+                                    kodeBarang = loanFormItem.inventoryItem.noinv,
+                                    jumlah = loanFormItem.quantity,
                                     imageUri = loanFormItem.imageUri?.toString()
                                 )
                             }
-                            // Navigate back to loans screen
-                            navController.popBackStack(com.example.stora.navigation.Routes.LOANS_SCREEN, false)
+
+                            // Save to Room and sync to server via ViewModel
+                            loanViewModel.createLoan(
+                                namaPeminjam = borrowerName,
+                                noHpPeminjam = borrowerPhone,
+                                tanggalPinjam = borrowDate,
+                                tanggalKembali = returnDate,
+                                items = loanItemInfos,
+                                onSuccess = {
+                                    // Also save to LoansData for backward compatibility
+                                    loanItems.forEach { loanFormItem ->
+                                        LoansData.addLoan(
+                                            name = loanFormItem.inventoryItem.name,
+                                            code = loanFormItem.inventoryItem.noinv,
+                                            quantity = loanFormItem.quantity,
+                                            borrower = borrowerName,
+                                            borrowerPhone = borrowerPhone,
+                                            borrowDate = borrowDate,
+                                            returnDate = returnDate,
+                                            imageUri = loanFormItem.imageUri?.toString()
+                                        )
+                                    }
+                                    // Navigate back to loans screen
+                                    navController.popBackStack(com.example.stora.navigation.Routes.LOANS_SCREEN, false)
+                                },
+                                onError = { error ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error: $error",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            )
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -468,14 +541,21 @@ fun LoanFormScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = StoraYellowButton
                         ),
-                        enabled = borrowerName.isNotBlank() && borrowDate.isNotBlank() && returnDate.isNotBlank()
+                        enabled = borrowerName.isNotBlank() && borrowDate.isNotBlank() && returnDate.isNotBlank() && !isLoading
                     ) {
-                        Text(
-                            text = "Save",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StoraBlueDark
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = StoraBlueDark
+                            )
+                        } else {
+                            Text(
+                                text = "Save",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StoraBlueDark
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

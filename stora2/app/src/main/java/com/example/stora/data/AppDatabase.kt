@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [InventoryItem::class],
-    version = 2,
+    entities = [InventoryItem::class, LoanEntity::class, LoanItemEntity::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun inventoryDao(): InventoryDao
+    abstract fun loanDao(): LoanDao
 
     companion object {
         @Volatile
@@ -33,3 +34,4 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+

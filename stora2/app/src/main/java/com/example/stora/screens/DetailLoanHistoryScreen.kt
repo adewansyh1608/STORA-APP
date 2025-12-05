@@ -167,6 +167,18 @@ fun DetailLoanHistoryScreen(
                             color = StoraBlueDark
                         )
                         
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        // Phone Number
+                        if (!loan.borrowerPhone.isNullOrEmpty()) {
+                            Text(
+                                text = loan.borrowerPhone,
+                                fontSize = 14.sp,
+                                color = textGray,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         // Borrow and Return Dates

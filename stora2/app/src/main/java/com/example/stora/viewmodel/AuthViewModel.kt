@@ -122,11 +122,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         // Clear all saved data
                         tokenManager.clearAll()
 
-                        // Clear Room database
+                        // Clear Room database (both inventory and loans)
                         viewModelScope.launch {
                             try {
                                 database.inventoryDao().clearAllInventoryItems()
-                                android.util.Log.d("AuthViewModel", "Room database cleared on logout")
+                                database.loanDao().clearAllLoanData()
+                                // Clear in-memory LoansData
+                                com.example.stora.data.LoansData.clearAll()
+                                android.util.Log.d("AuthViewModel", "Room database (inventory + loans) cleared on logout")
                             } catch (e: Exception) {
                                 android.util.Log.e("AuthViewModel", "Error clearing Room database", e)
                             }
@@ -144,10 +147,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         // Clear data even if logout API fails
                         tokenManager.clearAll()
 
-                        // Clear Room database
+                        // Clear Room database (both inventory and loans)
                         viewModelScope.launch {
                             try {
                                 database.inventoryDao().clearAllInventoryItems()
+                                database.loanDao().clearAllLoanData()
+                                // Clear in-memory LoansData
+                                com.example.stora.data.LoansData.clearAll()
                                 android.util.Log.d("AuthViewModel", "Room database cleared on logout (with error)")
                             } catch (e: Exception) {
                                 android.util.Log.e("AuthViewModel", "Error clearing Room database", e)
@@ -166,10 +172,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 // No token, just clear state
                 tokenManager.clearAll()
 
-                // Clear Room database
+                // Clear Room database (both inventory and loans)
                 viewModelScope.launch {
                     try {
                         database.inventoryDao().clearAllInventoryItems()
+                        database.loanDao().clearAllLoanData()
+                        // Clear in-memory LoansData
+                        com.example.stora.data.LoansData.clearAll()
                         android.util.Log.d("AuthViewModel", "Room database cleared (no token)")
                     } catch (e: Exception) {
                         android.util.Log.e("AuthViewModel", "Error clearing Room database", e)

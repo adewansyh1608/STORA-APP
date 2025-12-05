@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.stora.data.LoansData
@@ -40,16 +41,22 @@ import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellow
 import com.example.stora.ui.theme.StoraYellowButton
 import com.example.stora.utils.FileUtils
+import com.example.stora.viewmodel.LoanViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailLoanScreen(
     navController: NavHostController,
-    loanId: Int
+    loanId: Int,
+    loanViewModel: LoanViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var isVisible by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val isLoading by loanViewModel.isLoading.collectAsState()
     
     // Map untuk menyimpan return image per item
     val returnImageUris = remember { mutableMapOf<Int, Uri?>() }
@@ -180,7 +187,18 @@ fun DetailLoanScreen(
                             color = StoraBlueDark
                         )
                         
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        // Phone Number
+                        if (!loan.borrowerPhone.isNullOrEmpty()) {
+                            Text(
+                                text = loan.borrowerPhone,
+                                fontSize = 14.sp,
+                                color = textGray,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
                         
                         // Borrow Date
                         Text(
@@ -413,15 +431,19 @@ fun DetailLoanScreen(
                         // Return Button
                         Button(
                             onClick = {
-                                // Return all items in the group with their respective return images
-                                loanGroup.forEach { item ->
-                                    LoansData.returnLoan(
-                                        loanId = item.id,
-                                        returnImageUri = returnImageUris[item.id]?.toString()
-                                    )
+                                scope.launch {
+                                    // Return all items in the group with their respective return images
+                                    // Update LoansData for in-memory data
+                                    loanGroup.forEach { item ->
+                                        LoansData.returnLoan(
+                                            loanId = item.id,
+                                            returnImageUri = returnImageUris[item.id]?.toString()
+                                        )
+                                    }
+                                    
+                                    // Navigate back to LoansScreen
+                                    navController.popBackStack(Routes.LOANS_SCREEN, false)
                                 }
-                                // Navigate back to LoansScreen
-                                navController.popBackStack(Routes.LOANS_SCREEN, false)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -429,14 +451,22 @@ fun DetailLoanScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = StoraYellowButton
-                            )
+                            ),
+                            enabled = !isLoading
                         ) {
-                            Text(
-                                text = "Return",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = StoraBlueDark
-                            )
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = StoraBlueDark
+                                )
+                            } else {
+                                Text(
+                                    text = "Return",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StoraBlueDark
+                                )
+                            }
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))

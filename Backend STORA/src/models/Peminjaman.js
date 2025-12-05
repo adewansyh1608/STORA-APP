@@ -30,6 +30,11 @@ const Peminjaman = sequelize.define(
       allowNull: true,
       field: 'Tanggal_Kembali',
     },
+    Tanggal_Dikembalikan: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'Tanggal_Dikembalikan',
+    },
     Status: {
       type: DataTypes.ENUM(
         'Menunggu',

@@ -24,7 +24,7 @@ class PeminjamanController {
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['createdAt', 'DESC']],
+        order: [['ID_Peminjaman', 'DESC']],
         include: [
           {
             association: 'user',
@@ -90,7 +90,7 @@ class PeminjamanController {
           }
         ]
       });
-      
+
       if (!peminjaman) {
         return res.status(404).json({
           success: false,
@@ -113,7 +113,7 @@ class PeminjamanController {
   // Create new peminjaman
   async createPeminjaman(req, res) {
     const transaction = await sequelize.transaction();
-    
+
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -126,10 +126,10 @@ class PeminjamanController {
       }
 
       const { barangList, ...peminjamanData } = req.body;
-      
+
       // Create peminjaman
       const newPeminjaman = await Peminjaman.create(peminjamanData, { transaction });
-      
+
       // Create peminjaman barang entries
       if (barangList && barangList.length > 0) {
         const peminjamanBarangData = barangList.map(item => ({
@@ -137,12 +137,12 @@ class PeminjamanController {
           ID_Inventaris: item.ID_Inventaris,
           Jumlah: item.Jumlah
         }));
-        
+
         await PeminjamanBarang.bulkCreate(peminjamanBarangData, { transaction });
       }
-      
+
       await transaction.commit();
-      
+
       // Fetch the complete peminjaman data
       const completePeminjaman = await Peminjaman.findByPk(newPeminjaman.ID_Peminjaman, {
         include: [
@@ -157,7 +157,7 @@ class PeminjamanController {
           }
         ]
       });
-      
+
       res.status(201).json({
         success: true,
         message: 'Peminjaman created successfully',
@@ -176,13 +176,18 @@ class PeminjamanController {
   async updatePeminjamanStatus(req, res) {
     try {
       const { id } = req.params;
-      const { Status } = req.body;
-      
+      const { Status, Tanggal_Dikembalikan } = req.body;
+
+      const updateData = { Status };
+      if (Tanggal_Dikembalikan) {
+        updateData.Tanggal_Dikembalikan = Tanggal_Dikembalikan;
+      }
+
       const [updatedRowsCount] = await Peminjaman.update(
-        { Status },
+        updateData,
         { where: { ID_Peminjaman: id } }
       );
-      
+
       if (updatedRowsCount === 0) {
         return res.status(404).json({
           success: false,
@@ -216,7 +221,7 @@ class PeminjamanController {
         ],
         group: ['Status']
       });
-      
+
       const overdueCount = await Peminjaman.count({
         where: {
           Status: 'Dipinjam',

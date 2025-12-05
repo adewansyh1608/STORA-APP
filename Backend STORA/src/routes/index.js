@@ -4,6 +4,7 @@ const router = express.Router();
 // Import route modules
 const authRoutes = require('./authRoutes');
 const inventarisRoutes = require('./inventarisRoutes');
+const peminjamanRoutes = require('./peminjamanRoutes');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -20,5 +21,8 @@ router.use('/', authRoutes);
 
 // Mount inventaris routes
 router.use('/inventaris', inventarisRoutes);
+
+// Mount peminjaman routes
+router.use('/peminjaman', peminjamanRoutes);
 
 module.exports = router;
