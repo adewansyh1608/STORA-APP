@@ -72,45 +72,40 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updateInMemoryLoansData(loans: List<LoanWithItems>, isHistory: Boolean) {
         // Sync Room data to in-memory LoansData for backward compatibility with existing screens
+        // Clear the target list and rebuild from Room data to prevent duplicates
+        val targetList = if (isHistory) {
+            com.example.stora.data.LoansData.loansHistory
+        } else {
+            com.example.stora.data.LoansData.loansOnLoan
+        }
+        
+        // Remove items that have roomLoanId (Room-managed items) and rebuild
+        targetList.removeAll { it.roomLoanId != null }
+        
+        // Add all items from Room
         loans.forEach { loanWithItems ->
             val loan = loanWithItems.loan
             val items = loanWithItems.items
             
             items.forEach { item ->
-                val existingItem = if (isHistory) {
-                    com.example.stora.data.LoansData.loansHistory.find { 
-                        it.roomLoanId == loan.id && it.roomItemId == item.id 
-                    }
-                } else {
-                    com.example.stora.data.LoansData.loansOnLoan.find { 
-                        it.roomLoanId == loan.id && it.roomItemId == item.id 
-                    }
-                }
+                val loanItem = com.example.stora.data.LoanItem(
+                    id = item.id.hashCode(),
+                    groupId = loan.id.hashCode(),
+                    name = item.namaBarang,
+                    code = item.kodeBarang,
+                    quantity = item.jumlah,
+                    borrower = loan.namaPeminjam,
+                    borrowerPhone = loan.noHpPeminjam,
+                    borrowDate = loan.tanggalPinjam,
+                    returnDate = loan.tanggalKembali,
+                    actualReturnDate = loan.tanggalDikembalikan,
+                    imageUri = item.imageUri,
+                    returnImageUri = item.returnImageUri,
+                    roomLoanId = loan.id,
+                    roomItemId = item.id
+                )
                 
-                if (existingItem == null) {
-                    val loanItem = com.example.stora.data.LoanItem(
-                        id = item.id.hashCode(),
-                        groupId = loan.id.hashCode(),
-                        name = item.namaBarang,
-                        code = item.kodeBarang,
-                        quantity = item.jumlah,
-                        borrower = loan.namaPeminjam,
-                        borrowerPhone = loan.noHpPeminjam,
-                        borrowDate = loan.tanggalPinjam,
-                        returnDate = loan.tanggalKembali,
-                        actualReturnDate = loan.tanggalDikembalikan,
-                        imageUri = item.imageUri,
-                        returnImageUri = item.returnImageUri,
-                        roomLoanId = loan.id,
-                        roomItemId = item.id
-                    )
-                    
-                    if (isHistory) {
-                        com.example.stora.data.LoansData.loansHistory.add(loanItem)
-                    } else {
-                        com.example.stora.data.LoansData.loansOnLoan.add(loanItem)
-                    }
-                }
+                targetList.add(loanItem)
             }
         }
     }

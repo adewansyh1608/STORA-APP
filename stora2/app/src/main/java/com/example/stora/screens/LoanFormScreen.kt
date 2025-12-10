@@ -508,19 +508,8 @@ fun LoanFormScreen(
                                 tanggalKembali = returnDate,
                                 items = loanItemInfos,
                                 onSuccess = {
-                                    // Also save to LoansData for backward compatibility
-                                    loanItems.forEach { loanFormItem ->
-                                        LoansData.addLoan(
-                                            name = loanFormItem.inventoryItem.name,
-                                            code = loanFormItem.inventoryItem.noinv,
-                                            quantity = loanFormItem.quantity,
-                                            borrower = borrowerName,
-                                            borrowerPhone = borrowerPhone,
-                                            borrowDate = borrowDate,
-                                            returnDate = returnDate,
-                                            imageUri = loanFormItem.imageUri?.toString()
-                                        )
-                                    }
+                                    // ViewModel already syncs Room data to LoansData automatically
+                                    // No need to manually add to LoansData here
                                     // Navigate back to loans screen
                                     navController.popBackStack(com.example.stora.navigation.Routes.LOANS_SCREEN, false)
                                 },
