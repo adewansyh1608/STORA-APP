@@ -42,6 +42,11 @@ const User = sequelize.define(
       defaultValue: false,
       field: 'isLoggedIn',
     },
+    Foto_Profile: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'Foto_Profile',
+    },
   },
   {
     tableName: 'users',

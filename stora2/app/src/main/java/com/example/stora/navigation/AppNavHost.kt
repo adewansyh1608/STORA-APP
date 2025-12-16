@@ -380,5 +380,23 @@ fun AppNavHost(
         ) {
             SettingScreen(navController = navController)
         }
+
+        composable(
+            route = Routes.REMINDER_SETTINGS_SCREEN,
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(500)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(500)
+                )
+            }
+        ) {
+            com.example.stora.screens.ReminderSettingsScreen(navController = navController)
+        }
     }
 }

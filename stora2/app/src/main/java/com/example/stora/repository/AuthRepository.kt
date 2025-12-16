@@ -108,10 +108,32 @@ class AuthRepository {
         }
     }
     
-    suspend fun updateProfile(token: String, name: String?, email: String?): Result<AuthResponse> {
+    suspend fun updateProfile(token: String, name: String?, email: String?, fotoProfile: String? = null): Result<AuthResponse> {
         return try {
-            val updateRequest = UpdateProfileRequest(name, email)
+            val updateRequest = UpdateProfileRequest(name, email, fotoProfile)
             val response = apiService.updateProfile("Bearer $token", updateRequest)
+            
+            if (response.isSuccessful) {
+                response.body()?.let { authResponse ->
+                    Result.success(authResponse)
+                } ?: Result.failure(Exception("Response body is null"))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                val errorResponse = try {
+                    Gson().fromJson(errorBody, ErrorResponse::class.java)
+                } catch (e: Exception) {
+                    ErrorResponse(false, "Unknown error occurred", null)
+                }
+                Result.failure(Exception(errorResponse.message))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun uploadProfilePhoto(token: String, photoPart: okhttp3.MultipartBody.Part): Result<AuthResponse> {
+        return try {
+            val response = apiService.uploadProfilePhoto("Bearer $token", photoPart)
             
             if (response.isSuccessful) {
                 response.body()?.let { authResponse ->

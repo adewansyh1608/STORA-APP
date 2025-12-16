@@ -35,24 +35,32 @@ import coil.compose.AsyncImage
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.utils.FileUtils
 import com.example.stora.viewmodel.UserProfileViewModel
+import com.example.stora.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
     navController: NavHostController,
-    viewModel: UserProfileViewModel = viewModel()
+    viewModel: UserProfileViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val userProfile by viewModel.userProfile.collectAsState()
     
     var name by remember { mutableStateOf(userProfile.name) }
-    var description by remember { mutableStateOf(userProfile.address) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(userProfile.profileImageUri) }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     
     var showImagePickerDialog by remember { mutableStateOf(false) }
     var isVisible by remember { mutableStateOf(false) }
+    var isUploading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -85,8 +93,16 @@ fun EditProfileScreen(
     }
 
     LaunchedEffect(Unit) {
+        // Reload profile from TokenManager to get latest data
+        viewModel.loadProfileFromToken()
         delay(100)
         isVisible = true
+    }
+    
+    // Update local state when viewModel profile changes
+    LaunchedEffect(userProfile) {
+        name = userProfile.name
+        selectedImageUri = userProfile.profileImageUri
     }
 
     Box(
@@ -167,36 +183,57 @@ fun EditProfileScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = description,
-                            onValueChange = { description = it },
-                            label = { Text("Deskripsi") },
-                            modifier = Modifier.fillMaxWidth(),
-                            minLines = 4,
-                            maxLines = 6,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = StoraBlueDark,
-                                focusedLabelColor = StoraBlueDark
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Save Button
                         Button(
                             onClick = {
-                                viewModel.updateProfile(
-                                    name = name,
-                                    email = null,
-                                    phone = null,
-                                    address = description,
-                                    profileImageUri = selectedImageUri
-                                )
-                                navController.popBackStack()
+                                // Upload photo to backend if a new image was selected
+                                selectedImageUri?.let { uri ->
+                                    val file = FileUtils.getFileFromUri(context, uri)
+                                    if (file != null) {
+                                        isUploading = true
+                                        val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
+                                        val photoPart = MultipartBody.Part.createFormData("photo", file.name, requestBody)
+                                        
+                                        authViewModel.uploadProfilePhoto(
+                                            photoPart = photoPart,
+                                            onSuccess = { photoUrl ->
+                                                // Update local profile with server URL
+                                                viewModel.updateProfile(
+                                                    name = name,
+                                                    email = null,
+                                                    phone = null,
+                                                    address = null,
+                                                    profileImageUri = Uri.parse(photoUrl)
+                                                )
+                                                isUploading = false
+                                                navController.popBackStack()
+                                            },
+                                            onError = { error ->
+                                                isUploading = false
+                                                // Still update local
+                                                viewModel.updateProfile(
+                                                    name = name,
+                                                    email = null,
+                                                    phone = null,
+                                                    address = null,
+                                                    profileImageUri = uri
+                                                )
+                                                navController.popBackStack()
+                                            }
+                                        )
+                                    } else {
+                                        // No file, just update name
+                                        authViewModel.updateProfile(name = name, email = null, fotoProfile = null)
+                                        navController.popBackStack()
+                                    }
+                                } ?: run {
+                                    // No image selected, just update name
+                                    authViewModel.updateProfile(name = name, email = null, fotoProfile = null)
+                                    navController.popBackStack()
+                                }
                             },
+                            enabled = !isUploading,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
@@ -234,7 +271,7 @@ fun EditProfileScreen(
                                 .background(Color(0xFFFFA726)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (selectedImageUri != null) {
+                            if (selectedImageUri != null && selectedImageUri.toString().isNotEmpty()) {
                                 AsyncImage(
                                     model = selectedImageUri,
                                     contentDescription = "Profile Picture",

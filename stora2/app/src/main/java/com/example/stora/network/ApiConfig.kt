@@ -12,6 +12,10 @@ object ApiConfig {
     // Untuk device fisik: "http://YOUR_LOCAL_IP:3000/api/"
     // Jika error 404, coba ganti ke "http://10.0.2.2:3000/" tanpa /api/
     private const val BASE_URL = "http://10.0.2.2:3000/api/v1/"
+    
+    // Server URL for constructing image URLs (without /api/v1/)
+    const val SERVER_URL = "http://10.0.2.2:3000"
+    
     private const val TAG = "ApiConfig"
 
     private fun provideOkHttpClient(): OkHttpClient {

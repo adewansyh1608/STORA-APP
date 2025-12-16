@@ -1,16 +1,10 @@
 package com.example.stora.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import android.util.Log
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +32,7 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,10 +41,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,7 +57,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,25 +67,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.stora.data.LoansData
+import com.example.stora.data.NotificationHistoryApiModel
+import com.example.stora.network.ApiConfig
 import com.example.stora.ui.theme.StoraBlueDark
+import com.example.stora.utils.TokenManager
 import com.example.stora.viewmodel.UserProfileViewModel
-
-// Data class untuk item reminder
-data class Reminder(
-    val id: Int,
-    val type: String,
-    val description: String,
-    val icon: ImageVector
-)
-
-// Data dummy untuk ditampilkan
-val dummyReminders = listOf(
-    Reminder(1, "Inventory", "Cek Kondisi Barang B", Icons.Outlined.Inventory2),
-    Reminder(2, "Loans", "Hari Ini Pengembalian Barang B", Icons.AutoMirrored.Outlined.ReceiptLong),
-    Reminder(3, "Inventory", "Cek Kondisi Barang A", Icons.Outlined.Inventory2),
-    Reminder(4, "Loans", "Pengembalian Barang C Telat", Icons.AutoMirrored.Outlined.ReceiptLong),
-    Reminder(5, "Inventory", "Stok Opname Bulanan", Icons.Outlined.Inventory2),
-)
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Composable utama untuk HomeScreen
@@ -97,8 +86,40 @@ fun HomeScreen(
     userProfileViewModel: UserProfileViewModel,
     inventoryViewModel: com.example.stora.viewmodel.InventoryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val apiService = ApiConfig.provideApiService()
+    val tokenManager = TokenManager.getInstance(context)
+
     var isReminderExpanded by rememberSaveable { mutableStateOf(false) }
     val inventoryItems by inventoryViewModel.inventoryItems.collectAsState()
+
+    // State untuk notification history
+    var notificationHistory by remember { mutableStateOf<List<NotificationHistoryApiModel>>(emptyList()) }
+    var isLoadingNotifications by remember { mutableStateOf(true) }
+
+    // Load notification history from API
+    LaunchedEffect(Unit) {
+        // Reload profile from TokenManager to get latest data
+        userProfileViewModel.loadProfileFromToken()
+        
+        scope.launch {
+            try {
+                val authHeader = tokenManager.getAuthHeader()
+                if (authHeader != null) {
+                    val response = apiService.getNotificationHistory(authHeader)
+                    if (response.isSuccessful && response.body()?.success == true) {
+                        notificationHistory = response.body()?.data ?: emptyList()
+                        Log.d("HomeScreen", "Loaded ${notificationHistory.size} notifications")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HomeScreen", "Error loading notification history", e)
+            } finally {
+                isLoadingNotifications = false
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -166,13 +187,50 @@ fun HomeScreen(
                     item {
                         ReminderHeader(
                             isExpanded = isReminderExpanded,
-                            onClick = { isReminderExpanded = !isReminderExpanded }
+                            onClick = { isReminderExpanded = !isReminderExpanded },
+                            count = notificationHistory.size
                         )
                     }
 
-                    // Daftar Item Reminder
-                    items(dummyReminders) { reminder ->
-                        ReminderItem(reminder = reminder)
+                    // Loading indicator
+                    if (isLoadingNotifications) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = StoraBlueDark)
+                            }
+                        }
+                    } else if (notificationHistory.isEmpty()) {
+                        // Empty state
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Belum ada notifikasi.\nBuat pengingat untuk memulai.",
+                                        color = Color.Gray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Daftar Item Notification dari database
+                        items(notificationHistory) { notification ->
+                            NotificationHistoryItem(notification = notification)
+                        }
                     }
 
                     // Spacer di bagian bawah
@@ -213,7 +271,7 @@ private fun StoraTopBar(navController: NavHostController, userProfileViewModel: 
             IconButton(onClick = {
                 navController.navigate(com.example.stora.navigation.Routes.PROFILE_SCREEN)
             }) {
-                if (userProfile.profileImageUri != null) {
+                if (userProfile.profileImageUri != null && userProfile.profileImageUri.toString().isNotEmpty()) {
                     // Tampilkan foto profile
                     AsyncImage(
                         model = userProfile.profileImageUri,
@@ -330,7 +388,7 @@ private fun SummaryCard(
  * Header "Reminder" yang bisa diklik
  */
 @Composable
-private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit) {
+private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit, count: Int = 0) {
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
         animationSpec = tween(durationMillis = 300),
@@ -352,7 +410,7 @@ private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit) {
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = "Reminder",
+            text = if (count > 0) "Notifikasi ($count)" else "Notifikasi",
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
             color = StoraBlueDark
@@ -370,10 +428,10 @@ private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * Satu item di dalam daftar Reminder
+ * Satu item di dalam daftar Notification History
  */
 @Composable
-private fun ReminderItem(reminder: Reminder) {
+private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -397,8 +455,8 @@ private fun ReminderItem(reminder: Reminder) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = reminder.icon,
-                    contentDescription = reminder.type,
+                    imageVector = Icons.Outlined.Inventory2,
+                    contentDescription = "Notification",
                     tint = StoraBlueDark,
                     modifier = Modifier.size(28.dp)
                 )
@@ -406,17 +464,39 @@ private fun ReminderItem(reminder: Reminder) {
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = reminder.type,
+                    text = notification.judul ?: "Notifikasi",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = StoraBlueDark
                 )
                 Text(
-                    text = reminder.description,
+                    text = notification.pesan ?: "",
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
+                // Tampilkan tanggal jika ada
+                notification.tanggal?.let { dateStr ->
+                    Text(
+                        text = formatNotificationDate(dateStr),
+                        fontSize = 12.sp,
+                        color = Color.Gray.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
+    }
+}
+
+/**
+ * Format tanggal notifikasi untuk ditampilkan
+ */
+private fun formatNotificationDate(dateStr: String): String {
+    return try {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val date = inputFormat.parse(dateStr)
+        val outputFormat = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID"))
+        outputFormat.format(date!!)
+    } catch (e: Exception) {
+        dateStr
     }
 }

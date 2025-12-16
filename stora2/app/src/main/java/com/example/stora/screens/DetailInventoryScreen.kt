@@ -324,13 +324,14 @@ fun DetailContent(item: InventoryItem) {
                         .height(200.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFFF5F5F5))
-                        .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
                         model = photoUriString,
                         contentDescription = "Foto ${item.name}",
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                 }
                 Spacer(modifier = Modifier.height(24.dp))

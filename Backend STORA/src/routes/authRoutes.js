@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { body } = require('express-validator');
 const authMiddleware = require('../middleware/authMiddleware');
+const { profileUpload } = require('../middleware/upload');
 
 // Validation rules for signup
 const signupValidationRules = [
@@ -53,5 +54,8 @@ router.post('/login', loginValidationRules, authController.login);
 router.post('/logout', authMiddleware, authController.logout);
 router.get('/profile', authMiddleware, authController.getProfile);
 router.put('/profile', authMiddleware, profileUpdateValidationRules, authController.updateProfile);
+
+// Profile photo upload route
+router.post('/profile/photo', authMiddleware, profileUpload.single('photo'), authController.uploadProfilePhoto);
 
 module.exports = router;

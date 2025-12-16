@@ -8,6 +8,7 @@ const Peminjaman = require('./Peminjaman');
 const PeminjamanBarang = require('./PeminjamanBarang');
 const FotoPeminjaman = require('./FotoPeminjaman');
 const Notifikasi = require('./Notifikasi');
+const ReminderSetting = require('./ReminderSetting');
 
 // Define associations
 
@@ -81,6 +82,16 @@ Notifikasi.belongsTo(User, {
   as: 'user',
 });
 
+// User <-> ReminderSetting (One-to-Many)
+User.hasMany(ReminderSetting, {
+  foreignKey: 'ID_User',
+  as: 'reminder_settings',
+});
+ReminderSetting.belongsTo(User, {
+  foreignKey: 'ID_User',
+  as: 'user',
+});
+
 // Export all models and sequelize instance
 module.exports = {
   sequelize,
@@ -91,4 +102,6 @@ module.exports = {
   PeminjamanBarang,
   FotoPeminjaman,
   Notifikasi,
+  ReminderSetting,
 };
+

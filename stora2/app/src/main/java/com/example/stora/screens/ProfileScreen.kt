@@ -52,6 +52,8 @@ fun ProfileScreen(
     var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        // Reload profile from TokenManager to get latest data
+        viewModel.loadProfileFromToken()
         delay(100)
         isVisible = true
     }
@@ -183,7 +185,7 @@ fun ProfileScreen(
                             .background(Color(0xFFFFA726)), // Orange background
                         contentAlignment = Alignment.Center
                     ) {
-                        if (userProfile.profileImageUri != null) {
+                        if (userProfile.profileImageUri != null && userProfile.profileImageUri.toString().isNotEmpty()) {
                             AsyncImage(
                                 model = userProfile.profileImageUri,
                                 contentDescription = "Profile Picture",

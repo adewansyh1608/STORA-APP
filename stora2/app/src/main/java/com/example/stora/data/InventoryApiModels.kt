@@ -130,6 +130,15 @@ fun InventoryItem.toApiRequest(userId: Int): InventoryRequest {
 }
 
 fun InventoryApiModel.toInventoryItem(localId: String? = null, userId: Int): InventoryItem {
+    // Construct full photo URL if the path is relative (from server)
+    val fullPhotoUrl = this.foto?.firstOrNull()?.foto?.let { photoPath ->
+        if (photoPath.startsWith("/uploads/")) {
+            "${com.example.stora.network.ApiConfig.SERVER_URL}$photoPath"
+        } else {
+            photoPath
+        }
+    }
+    
     return InventoryItem(
         id = localId ?: java.util.UUID.randomUUID().toString(),
         name = this.namaBarang,
@@ -140,7 +149,7 @@ fun InventoryApiModel.toInventoryItem(localId: String? = null, userId: Int): Inv
         location = this.lokasi,
         description = this.deskripsi ?: "", // Get description from backend
         date = this.tanggalPengadaan,
-        photoUri = this.foto?.firstOrNull()?.foto,
+        photoUri = fullPhotoUrl,
         serverId = this.idInventaris,
         userId = userId,
         isSynced = true,

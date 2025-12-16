@@ -12,6 +12,7 @@ class TokenManager(context: Context) {
         private const val USER_ID_KEY = "user_id"
         private const val USER_NAME_KEY = "user_name"
         private const val USER_EMAIL_KEY = "user_email"
+        private const val USER_FOTO_PROFILE_KEY = "user_foto_profile"
 
         @Volatile
         private var instance: TokenManager? = null
@@ -31,13 +32,20 @@ class TokenManager(context: Context) {
         return prefs.getString(TOKEN_KEY, null)
     }
 
-    fun saveUserData(id: Int, name: String, email: String) {
+    fun saveUserData(id: Int, name: String, email: String, fotoProfile: String? = null) {
         prefs.edit().apply {
             putInt(USER_ID_KEY, id)
             putString(USER_NAME_KEY, name)
             putString(USER_EMAIL_KEY, email)
+            if (fotoProfile != null) {
+                putString(USER_FOTO_PROFILE_KEY, fotoProfile)
+            }
             apply()
         }
+    }
+
+    fun saveFotoProfile(fotoProfile: String?) {
+        prefs.edit().putString(USER_FOTO_PROFILE_KEY, fotoProfile).apply()
     }
 
     fun getUserId(): Int {
@@ -50,6 +58,10 @@ class TokenManager(context: Context) {
 
     fun getUserEmail(): String? {
         return prefs.getString(USER_EMAIL_KEY, null)
+    }
+
+    fun getFotoProfile(): String? {
+        return prefs.getString(USER_FOTO_PROFILE_KEY, null)
     }
 
     fun isLoggedIn(): Boolean {

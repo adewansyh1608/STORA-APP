@@ -3,7 +3,7 @@ const router = express.Router();
 const inventarisController = require('../controllers/inventarisController');
 const { body } = require('express-validator');
 const authMiddleware = require('../middleware/authMiddleware');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 
 
 const inventarisValidationRules = [

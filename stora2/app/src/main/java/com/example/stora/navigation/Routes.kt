@@ -19,6 +19,7 @@ object Routes {
     const val PROFILE_SCREEN = "profile"
     const val EDIT_PROFILE_SCREEN = "edit_profile"
     const val SETTING_SCREEN = "setting"
+    const val REMINDER_SETTINGS_SCREEN = "reminder_settings"
 
     fun detailScreen(itemId: String) = "detail/$itemId"
     fun editItemScreen(itemId: String) = "edit_item/$itemId"

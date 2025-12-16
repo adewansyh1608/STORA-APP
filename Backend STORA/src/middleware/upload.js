@@ -2,13 +2,18 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure uploads directory exists
+// Ensure uploads directories exist
 const uploadsDir = path.join(__dirname, '../../public/uploads/inventaris');
+const profileUploadsDir = path.join(__dirname, '../../public/uploads/profiles');
+
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+if (!fs.existsSync(profileUploadsDir)) {
+  fs.mkdirSync(profileUploadsDir, { recursive: true });
+}
 
-// Configure storage
+// Configure storage for inventory
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
@@ -19,6 +24,20 @@ const storage = multer.diskStorage({
     const ext = path.extname(file.originalname);
     const nameWithoutExt = path.basename(file.originalname, ext);
     cb(null, `${nameWithoutExt}-${uniqueSuffix}${ext}`);
+  }
+});
+
+// Configure storage for profile photos
+const profileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, profileUploadsDir);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with user ID if available
+    const userId = req.user?.id || 'unknown';
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `profile-${userId}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -54,7 +73,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 
-// Configure multer
+// Configure multer for inventory
 const upload = multer({
   storage: storage,
   limits: {
@@ -63,4 +82,13 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-module.exports = upload;
+// Configure multer for profile photos
+const profileUpload = multer({
+  storage: profileStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+  fileFilter: fileFilter
+});
+
+module.exports = { upload, profileUpload };

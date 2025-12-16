@@ -57,9 +57,9 @@ class AuthController {
 
       // Generate JWT token
       const token = jwt.sign(
-        { 
-          id: newUser.ID_User, 
-          email: newUser.Email 
+        {
+          id: newUser.ID_User,
+          email: newUser.Email
         },
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: process.env.JWT_EXPIRE || '7d' }
@@ -109,9 +109,9 @@ class AuthController {
       const { email, password } = req.body;
 
       // Find user by email
-      const user = await User.findOne({ 
+      const user = await User.findOne({
         where: { Email: email },
-        attributes: ['ID_User', 'Nama_User', 'Email', 'Password']
+        attributes: ['ID_User', 'Nama_User', 'Email', 'Password', 'Foto_Profile']
       });
 
       if (!user) {
@@ -139,9 +139,9 @@ class AuthController {
 
       // Generate JWT token
       const token = jwt.sign(
-        { 
-          id: user.ID_User, 
-          email: user.Email 
+        {
+          id: user.ID_User,
+          email: user.Email
         },
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: process.env.JWT_EXPIRE || '7d' }
@@ -154,6 +154,7 @@ class AuthController {
           id: user.ID_User,
           name: user.Nama_User,
           email: user.Email,
+          foto_profile: user.Foto_Profile,
           email_verified_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -203,7 +204,7 @@ class AuthController {
   async getProfile(req, res) {
     try {
       const user = await User.findByPk(req.user.id, {
-        attributes: ['ID_User', 'Nama_User', 'Email']
+        attributes: ['ID_User', 'Nama_User', 'Email', 'Foto_Profile']
       });
 
       if (!user) {
@@ -222,6 +223,7 @@ class AuthController {
           id: user.ID_User,
           name: user.Nama_User,
           email: user.Email,
+          foto_profile: user.Foto_Profile,
           email_verified_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -257,18 +259,18 @@ class AuthController {
         });
       }
 
-      const { name, email } = req.body;
+      const { name, email, foto_profile } = req.body;
       const userId = req.user.id;
 
       // Check if email is already taken by another user
       if (email) {
-        const existingUser = await User.findOne({ 
-          where: { 
+        const existingUser = await User.findOne({
+          where: {
             Email: email,
             ID_User: { [Op.ne]: userId }
-          } 
+          }
         });
-        
+
         if (existingUser) {
           return res.status(400).json({
             success: false,
@@ -284,6 +286,7 @@ class AuthController {
       const updateData = {};
       if (name) updateData.Nama_User = name;
       if (email) updateData.Email = email;
+      if (foto_profile !== undefined) updateData.Foto_Profile = foto_profile;
 
       await User.update(updateData, {
         where: { ID_User: userId }
@@ -291,7 +294,7 @@ class AuthController {
 
       // Get updated user
       const updatedUser = await User.findByPk(userId, {
-        attributes: ['ID_User', 'Nama_User', 'Email']
+        attributes: ['ID_User', 'Nama_User', 'Email', 'Foto_Profile']
       });
 
       res.status(200).json({
@@ -301,6 +304,7 @@ class AuthController {
           id: updatedUser.ID_User,
           name: updatedUser.Nama_User,
           email: updatedUser.Email,
+          foto_profile: updatedUser.Foto_Profile,
           email_verified_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -314,6 +318,55 @@ class AuthController {
         message: 'Internal server error',
         data: null,
         token: null
+      });
+    }
+  }
+
+  // Upload profile photo
+  async uploadProfilePhoto(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No photo file uploaded',
+          data: null
+        });
+      }
+
+      const userId = req.user.id;
+
+      // Construct the URL for the uploaded file
+      const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
+      const photoUrl = `${baseUrl}/uploads/profiles/${req.file.filename}`;
+
+      // Update user's foto_profile in database
+      await User.update(
+        { Foto_Profile: photoUrl },
+        { where: { ID_User: userId } }
+      );
+
+      // Get updated user
+      const updatedUser = await User.findByPk(userId, {
+        attributes: ['ID_User', 'Nama_User', 'Email', 'Foto_Profile']
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile photo uploaded successfully',
+        data: {
+          id: updatedUser.ID_User,
+          name: updatedUser.Nama_User,
+          email: updatedUser.Email,
+          foto_profile: updatedUser.Foto_Profile,
+          photo_url: photoUrl
+        }
+      });
+    } catch (error) {
+      console.error('Upload profile photo error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload profile photo',
+        data: null
       });
     }
   }

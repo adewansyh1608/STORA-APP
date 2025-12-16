@@ -17,11 +17,21 @@ const { connectDB } = require('./config/db');
 // Initialize models (imports and sets up associations)
 require('./src/models');
 
+// Import Firebase Admin and scheduler
+const { initializeFirebase } = require('./src/services/firebaseAdmin');
+const reminderScheduler = require('./src/services/reminderScheduler');
+
 // Create Express app
 const app = express();
 
 // Connect to database and sync models
 connectDB();
+
+// Initialize Firebase Admin SDK
+initializeFirebase();
+
+// Start reminder scheduler
+reminderScheduler.start();
 
 // Security middleware
 app.use(helmet());

@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -89,7 +92,63 @@ fun InventoryScreen(
 
     Scaffold(
         containerColor = StoraBlueDark,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                snackbar = { snackbarData ->
+                    // Determine snackbar type based on message content
+                    val isSuccess = snackbarData.visuals.message.contains("berhasil", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("success", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("sync", ignoreCase = true)
+                    val isError = snackbarData.visuals.message.contains("gagal", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("error", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("failed", ignoreCase = true)
+                    
+                    val backgroundColor = when {
+                        isSuccess -> Color(0xFF00C853) // Bright Green
+                        isError -> Color(0xFFE53935) // Red
+                        else -> Color(0xFF1976D2) // Blue for info
+                    }
+                    
+                    val icon = when {
+                        isSuccess -> Icons.Filled.CheckCircle
+                        isError -> Icons.Filled.Error
+                        else -> Icons.Filled.CloudDone
+                    }
+                    
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = StoraWhite,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = snackbarData.visuals.message,
+                                color = StoraWhite,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -183,22 +242,41 @@ fun InventoryScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Online/Offline indicator
+                // Online/Offline indicator and Bell icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = if (viewModel.isOnline()) Icons.Filled.CloudDone else Icons.Filled.CloudOff,
-                        contentDescription = if (viewModel.isOnline()) "Online" else "Offline",
-                        tint = if (viewModel.isOnline()) Color(0xFF4CAF50) else Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = if (viewModel.isOnline()) "Online" else "Offline",
-                        color = if (viewModel.isOnline()) Color(0xFF4CAF50) else Color.Gray,
-                        fontSize = 12.sp
-                    )
+                    // Online/Offline indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (viewModel.isOnline()) Icons.Filled.CloudDone else Icons.Filled.CloudOff,
+                            contentDescription = if (viewModel.isOnline()) "Online" else "Offline",
+                            tint = if (viewModel.isOnline()) Color(0xFF4CAF50) else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = if (viewModel.isOnline()) "Online" else "Offline",
+                            color = if (viewModel.isOnline()) Color(0xFF4CAF50) else Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
+                    
+                    // Bell icon for notification settings
+                    IconButton(
+                        onClick = { navController.navigate(Routes.REMINDER_SETTINGS_SCREEN) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Pengaturan Notifikasi",
+                            tint = StoraYellow,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 

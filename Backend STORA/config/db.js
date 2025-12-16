@@ -29,12 +29,11 @@ const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
-    
-    // Sync models in development
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
-      console.log('📊 Database models synchronized.');
-    }
+
+    // Sync models - use force: false to not alter existing tables
+    // New columns like Foto_Profile need to be added manually via SQL
+    await sequelize.sync({ force: false });
+    console.log('📊 Database models synchronized.');
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
     process.exit(1);

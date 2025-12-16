@@ -108,6 +108,13 @@ fun SettingScreen(navController: NavHostController) {
                         onCheckedChange = { notificationsEnabled = it }
                     )
 
+                    SettingMenuItem(
+                        icon = Icons.Default.Notifications,
+                        title = "Pengingat Inventory",
+                        subtitle = "Atur jadwal pengingat pengecekan",
+                        onClick = { navController.navigate(com.example.stora.navigation.Routes.REMINDER_SETTINGS_SCREEN) }
+                    )
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // About Section

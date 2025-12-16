@@ -55,7 +55,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         tokenManager.saveUserData(
                             id = userData.id,
                             name = userData.name,
-                            email = userData.email
+                            email = userData.email,
+                            fotoProfile = userData.fotoProfile
                         )
                     }
 
@@ -223,14 +224,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateProfile(name: String?, email: String?) {
+    fun updateProfile(name: String?, email: String?, fotoProfile: String? = null) {
         viewModelScope.launch {
             val currentToken = tokenManager.getToken()
             if (currentToken != null) {
                 _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
-                authRepository.updateProfile(currentToken, name, email)
+                authRepository.updateProfile(currentToken, name, email, fotoProfile)
                     .onSuccess { response ->
+                        // Save updated foto_profile to TokenManager
+                        if (fotoProfile != null) {
+                            tokenManager.saveFotoProfile(fotoProfile)
+                        }
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isSuccess = true,
@@ -270,5 +275,38 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isUserLoggedIn(): Boolean {
         return tokenManager.isLoggedIn()
+    }
+
+    fun uploadProfilePhoto(photoPart: okhttp3.MultipartBody.Part, onSuccess: (String) -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            val currentToken = tokenManager.getToken()
+            if (currentToken != null) {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+
+                authRepository.uploadProfilePhoto(currentToken, photoPart)
+                    .onSuccess { response ->
+                        // Save the foto_profile URL from server to TokenManager
+                        response.data?.fotoProfile?.let { photoUrl ->
+                            tokenManager.saveFotoProfile(photoUrl)
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSuccess = true,
+                            authResponse = response
+                        )
+                        onSuccess(response.data?.fotoProfile ?: "")
+                    }
+                    .onFailure { exception ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSuccess = false,
+                            errorMessage = exception.message
+                        )
+                        onError(exception.message ?: "Failed to upload photo")
+                    }
+            } else {
+                onError("No authentication token found")
+            }
+        }
     }
 }

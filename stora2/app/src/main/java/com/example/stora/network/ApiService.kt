@@ -44,6 +44,14 @@ interface ApiService {
         @Body updateProfileRequest: UpdateProfileRequest
     ): Response<AuthResponse>
 
+    // Upload profile photo
+    @Multipart
+    @POST("profile/photo")
+    suspend fun uploadProfilePhoto(
+        @Header("Authorization") token: String,
+        @Part photo: MultipartBody.Part
+    ): Response<AuthResponse>
+
     // ==================== INVENTORY ENDPOINTS ====================
 
     // Get all inventory items
@@ -164,5 +172,54 @@ interface ApiService {
     suspend fun getPeminjamanStats(
         @Header("Authorization") token: String
     ): Response<LoanApiResponse<Any>>
-}
 
+    // ==================== NOTIFICATION ENDPOINTS ====================
+
+    // Register FCM token
+    @POST("notifications/register-token")
+    suspend fun registerFcmToken(
+        @Header("Authorization") token: String,
+        @Body request: com.example.stora.data.FcmTokenRequest
+    ): Response<com.example.stora.data.NotificationApiResponse<Any>>
+
+    // Get all reminders for current user
+    @GET("notifications/reminders")
+    suspend fun getReminders(
+        @Header("Authorization") token: String
+    ): Response<com.example.stora.data.NotificationApiResponse<List<com.example.stora.data.ReminderApiModel>>>
+
+    // Create new reminder
+    @POST("notifications/reminders")
+    suspend fun createReminder(
+        @Header("Authorization") token: String,
+        @Body request: com.example.stora.data.ReminderRequest
+    ): Response<com.example.stora.data.NotificationApiResponse<com.example.stora.data.ReminderApiModel>>
+
+    // Update reminder
+    @PUT("notifications/reminders/{id}")
+    suspend fun updateReminder(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body request: com.example.stora.data.ReminderRequest
+    ): Response<com.example.stora.data.NotificationApiResponse<com.example.stora.data.ReminderApiModel>>
+
+    // Delete reminder
+    @DELETE("notifications/reminders/{id}")
+    suspend fun deleteReminder(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<com.example.stora.data.NotificationApiResponse<Any>>
+
+    // Toggle reminder active status
+    @PATCH("notifications/reminders/{id}/toggle")
+    suspend fun toggleReminder(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<com.example.stora.data.NotificationApiResponse<com.example.stora.data.ReminderApiModel>>
+
+    // Get notification history
+    @GET("notifications/history")
+    suspend fun getNotificationHistory(
+        @Header("Authorization") token: String
+    ): Response<com.example.stora.data.NotificationApiResponse<List<com.example.stora.data.NotificationHistoryApiModel>>>
+}

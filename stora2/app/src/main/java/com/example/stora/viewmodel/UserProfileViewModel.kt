@@ -1,7 +1,9 @@
 package com.example.stora.viewmodel
 
+import android.app.Application
 import android.net.Uri
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import com.example.stora.utils.TokenManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,9 +16,28 @@ data class UserProfile(
     val profileImageUri: Uri? = null
 )
 
-class UserProfileViewModel : ViewModel() {
+class UserProfileViewModel(application: Application) : AndroidViewModel(application) {
+    private val tokenManager = TokenManager.getInstance(application)
+    
     private val _userProfile = MutableStateFlow(UserProfile())
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+
+    init {
+        // Load profile from TokenManager on init
+        loadProfileFromToken()
+    }
+
+    fun loadProfileFromToken() {
+        val name = tokenManager.getUserName() ?: "NAMA PENGGUNA"
+        val email = tokenManager.getUserEmail() ?: ""
+        val fotoProfile = tokenManager.getFotoProfile()
+        
+        _userProfile.value = _userProfile.value.copy(
+            name = name,
+            email = email,
+            profileImageUri = if (fotoProfile != null) Uri.parse(fotoProfile) else null
+        )
+    }
 
     fun updateProfile(
         name: String? = null,
@@ -32,9 +53,15 @@ class UserProfileViewModel : ViewModel() {
             address = address ?: _userProfile.value.address,
             profileImageUri = profileImageUri ?: _userProfile.value.profileImageUri
         )
+        
+        // Save foto_profile to TokenManager
+        if (profileImageUri != null) {
+            tokenManager.saveFotoProfile(profileImageUri.toString())
+        }
     }
 
     fun updateProfileImage(uri: Uri) {
         _userProfile.value = _userProfile.value.copy(profileImageUri = uri)
+        tokenManager.saveFotoProfile(uri.toString())
     }
 }

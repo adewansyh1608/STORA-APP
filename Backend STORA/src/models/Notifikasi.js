@@ -10,6 +10,11 @@ const Notifikasi = sequelize.define(
       autoIncrement: true,
       field: 'ID_Notifikasi',
     },
+    Judul: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'Judul',
+    },
     Pesan: {
       type: DataTypes.STRING(255),
       allowNull: true,

@@ -25,7 +25,9 @@ data class UpdateProfileRequest(
     @SerializedName("name")
     val name: String?,
     @SerializedName("email")
-    val email: String?
+    val email: String?,
+    @SerializedName("foto_profile")
+    val fotoProfile: String?
 )
 
 // Response models
@@ -47,6 +49,8 @@ data class UserData(
     val name: String,
     @SerializedName("email")
     val email: String,
+    @SerializedName("foto_profile")
+    val fotoProfile: String?,
     @SerializedName("email_verified_at")
     val emailVerifiedAt: String?,
     @SerializedName("created_at")
