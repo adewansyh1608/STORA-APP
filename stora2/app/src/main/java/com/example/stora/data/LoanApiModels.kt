@@ -140,9 +140,16 @@ fun LoanApiModel.toLoanEntity(existingId: String? = null, userId: Int): LoanEnti
 
 /**
  * Convert API barang model to LoanItemEntity
+ * Uses serverId to generate consistent ID for proper sync behavior
  */
 fun LoanBarangApiModel.toLoanItemEntity(loanId: String): LoanItemEntity {
+    // Use a consistent ID based on server ID to prevent duplicates on sync
+    // If no serverId, fallback to UUID (for locally created items)
+    val itemId = idPeminjamanBarang?.let { "server_item_$it" } 
+        ?: java.util.UUID.randomUUID().toString()
+    
     return LoanItemEntity(
+        id = itemId,
         loanId = loanId,
         inventarisId = idInventaris,
         namaBarang = inventaris?.namaBarang ?: "",

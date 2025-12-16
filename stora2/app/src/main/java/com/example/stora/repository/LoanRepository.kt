@@ -298,9 +298,33 @@ class LoanRepository(
                             val loan = apiModel.toLoanEntity(existingLoan?.id, userId)
                             loanDao.insertLoan(loan)
 
+                            // Get existing loan items to preserve local image URIs
+                            val existingItems = loanDao.getLoanItems(loan.id)
+                            val existingItemsByServerId = existingItems.associateBy { it.serverId }
+                            val existingItemsByInventarisId = existingItems.associateBy { it.inventarisId }
+
+                            // Delete existing loan items for this loan before inserting new ones
+                            // This prevents duplication when syncing from server
+                            loanDao.deleteLoanItemsByLoanId(loan.id)
+
                             apiModel.barang?.forEach { barang ->
                                 val item = barang.toLoanItemEntity(loan.id)
-                                loanDao.insertLoanItem(item)
+                                
+                                // Preserve local image URIs from existing items
+                                // First try matching by serverId, then by inventarisId
+                                val existingItem = existingItemsByServerId[barang.idPeminjamanBarang]
+                                    ?: existingItemsByInventarisId[barang.idInventaris]
+                                
+                                val itemWithImages = if (existingItem != null) {
+                                    item.copy(
+                                        imageUri = existingItem.imageUri ?: item.imageUri,
+                                        returnImageUri = existingItem.returnImageUri ?: item.returnImageUri
+                                    )
+                                } else {
+                                    item
+                                }
+                                
+                                loanDao.insertLoanItem(itemWithImages)
                             }
 
                             syncedCount++

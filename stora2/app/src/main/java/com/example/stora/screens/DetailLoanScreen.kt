@@ -431,18 +431,45 @@ fun DetailLoanScreen(
                         // Return Button
                         Button(
                             onClick = {
-                                scope.launch {
-                                    // Return all items in the group with their respective return images
-                                    // Update LoansData for in-memory data
-                                    loanGroup.forEach { item ->
-                                        LoansData.returnLoan(
-                                            loanId = item.id,
-                                            returnImageUri = returnImageUris[item.id]?.toString()
-                                        )
-                                    }
+                                // Get the Room loan ID from the first item
+                                val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                                
+                                if (roomLoanId != null) {
+                                    // Prepare item return images map using roomItemId
+                                    val itemReturnImages = loanGroup.mapNotNull { item ->
+                                        item.roomItemId?.let { itemId ->
+                                            itemId to returnImageUris[item.id]?.toString()
+                                        }
+                                    }.toMap()
                                     
-                                    // Navigate back to LoansScreen
-                                    navController.popBackStack(Routes.LOANS_SCREEN, false)
+                                    // Call ViewModel to update Room and sync
+                                    loanViewModel.returnLoan(
+                                        loanId = roomLoanId,
+                                        itemReturnImages = itemReturnImages,
+                                        onSuccess = {
+                                            // Navigate back to LoansScreen
+                                            navController.popBackStack(Routes.LOANS_SCREEN, false)
+                                        },
+                                        onError = { error ->
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Error: $error",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Fallback for items without Room ID (older data)
+                                    scope.launch {
+                                        loanGroup.forEach { item ->
+                                            LoansData.returnLoan(
+                                                loanId = item.id,
+                                                returnImageUri = returnImageUris[item.id]?.toString()
+                                            )
+                                        }
+                                        navController.popBackStack(Routes.LOANS_SCREEN, false)
+                                    }
                                 }
                             },
                             modifier = Modifier
