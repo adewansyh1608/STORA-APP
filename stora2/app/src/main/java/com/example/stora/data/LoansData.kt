@@ -17,6 +17,7 @@ data class LoanItem(
     val borrowDate: String? = null,
     val returnDate: String? = null,
     val actualReturnDate: String? = null,
+    val status: String? = null,  // Dipinjam, Selesai, Terlambat
     val imageUri: String? = null,
     val returnImageUri: String? = null,
     val roomLoanId: String? = null,

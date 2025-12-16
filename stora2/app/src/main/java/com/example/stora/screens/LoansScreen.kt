@@ -14,6 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,13 +29,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.stora.navigation.Routes
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
+import com.example.stora.ui.theme.StoraYellow
 import com.example.stora.ui.theme.StoraYellowButton
 import com.example.stora.data.LoansData
 import com.example.stora.data.LoanItem
+import com.example.stora.viewmodel.LoanViewModel
 import kotlinx.coroutines.launch
 
 data class GroupedLoanItem(
@@ -38,6 +46,8 @@ data class GroupedLoanItem(
     val borrower: String?,
     val borrowDate: String?,
     val returnDate: String?,
+    val actualReturnDate: String?,
+    val status: String?,
     val totalQuantity: Int,
     val items: List<LoanItem>,
     val firstItemId: Int
@@ -47,12 +57,23 @@ data class GroupedLoanItem(
 @Composable
 fun LoansScreen(
     navController: NavHostController,
-    showDeleteSnackbar: Boolean = false
+    showDeleteSnackbar: Boolean = false,
+    loanViewModel: LoanViewModel = viewModel()
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // ViewModel states
+    val isSyncing by loanViewModel.isSyncing.collectAsState()
+    val syncStatus by loanViewModel.syncStatus.collectAsState()
+    val unsyncedCount by loanViewModel.unsyncedCount.collectAsState()
+    val error by loanViewModel.error.collectAsState()
+    val isServerAvailable by loanViewModel.isServerAvailable.collectAsState()
+    
+    // Use server availability instead of just network check
+    val isActuallyOnline = loanViewModel.isOnline() && isServerAvailable
 
     val textGray = Color(0xFF585858)
     val dividerYellow = Color(0xFFEFBF6A)
@@ -77,6 +98,27 @@ fun LoansScreen(
                     ?.savedStateHandle
                     ?.set("history_deleted", false)
             }
+        }
+    }
+
+    // Show snackbar for sync status
+    LaunchedEffect(syncStatus) {
+        syncStatus?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    // Show snackbar for errors
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            loanViewModel.clearError()
         }
     }
 
@@ -105,6 +147,8 @@ fun LoansScreen(
                     borrower = items.firstOrNull()?.borrower,
                     borrowDate = items.firstOrNull()?.borrowDate,
                     returnDate = items.firstOrNull()?.returnDate,
+                    actualReturnDate = items.firstOrNull()?.actualReturnDate,
+                    status = items.firstOrNull()?.status,
                     totalQuantity = items.sumOf { it.quantity },
                     items = items,
                     firstItemId = items.firstOrNull()?.id ?: -1
@@ -118,28 +162,51 @@ fun LoansScreen(
             SnackbarHost(
                 hostState = snackbarHostState,
                 snackbar = { snackbarData ->
+                    val isSuccess = snackbarData.visuals.message.contains("berhasil", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("success", ignoreCase = true)
+                    val isError = snackbarData.visuals.message.contains("gagal", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("error", ignoreCase = true) ||
+                            snackbarData.visuals.message.contains("failed", ignoreCase = true)
+
+                    val backgroundColor = when {
+                        isSuccess -> Color(0xFF00C853) // Green
+                        isError -> Color(0xFFE53935) // Red
+                        else -> Color(0xFF1976D2) // Blue
+                    }
+
+                    val icon = when {
+                        isSuccess -> Icons.Filled.CheckCircle
+                        isError -> Icons.Filled.Error
+                        else -> Icons.Filled.CloudDone
+                    }
+
                     Card(
                         modifier = Modifier
-                            .padding(16.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                             .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF4CAF50)
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .padding(16.dp)
                                 .fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = StoraWhite,
+                                modifier = Modifier.size(24.dp)
+                            )
                             Text(
                                 text = snackbarData.visuals.message,
                                 color = StoraWhite,
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -147,12 +214,69 @@ fun LoansScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Routes.NEW_LOAN_SCREEN) },
-                containerColor = StoraYellowButton,
-                contentColor = StoraWhite
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Tambah Pinjaman")
+                // Sync button with badge
+                if (unsyncedCount > 0) {
+                    BadgedBox(
+                        badge = {
+                            Badge(
+                                containerColor = Color.Red,
+                                contentColor = StoraWhite
+                            ) {
+                                Text(
+                                    text = unsyncedCount.toString(),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    ) {
+                        FloatingActionButton(
+                            onClick = { loanViewModel.syncData() },
+                            containerColor = if (isActuallyOnline) StoraYellow else Color.Gray,
+                            contentColor = StoraWhite,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = StoraWhite,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (isActuallyOnline) Icons.Filled.Sync else Icons.Filled.CloudOff,
+                                    contentDescription = "Sync",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                } else if (isActuallyOnline) {
+                    FloatingActionButton(
+                        onClick = { loanViewModel.syncData() },
+                        containerColor = Color(0xFF4CAF50),
+                        contentColor = StoraWhite,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CloudDone,
+                            contentDescription = "Synced",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Add loan button
+                FloatingActionButton(
+                    onClick = { navController.navigate(Routes.NEW_LOAN_SCREEN) },
+                    containerColor = StoraYellowButton,
+                    contentColor = StoraWhite
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Tambah Pinjaman")
+                }
             }
         },
         bottomBar = {
@@ -167,14 +291,39 @@ fun LoansScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Title
-            Text(
-                text = "Loans",
-                color = StoraBlueDark,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 24.dp, bottom = 16.dp)
-            )
+            // Title with online/offline indicator
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Loans",
+                    color = StoraBlueDark,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Online/Offline indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isActuallyOnline) Icons.Filled.CloudDone else Icons.Filled.CloudOff,
+                        contentDescription = if (isActuallyOnline) "Online" else "Offline",
+                        tint = if (isActuallyOnline) Color(0xFF4CAF50) else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = if (isActuallyOnline) "Online" else "Offline",
+                        color = if (isActuallyOnline) Color(0xFF4CAF50) else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+            }
 
             // Tab Selector
             Row(
@@ -240,17 +389,29 @@ fun LoansScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (selectedTab == 0) "Tidak ada barang yang dipinjam" else "Tidak ada riwayat pinjaman",
-                        color = StoraWhite
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (selectedTab == 0) "Tidak ada barang yang dipinjam" else "Tidak ada riwayat pinjaman",
+                            color = textGray
+                        )
+                        if (!isActuallyOnline) {
+                            Text(
+                                text = "Offline - Data lokal",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
             } else if (groupedItems.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Tidak ada hasil untuk \"$searchQuery\"", color = StoraWhite)
+                    Text("Tidak ada hasil untuk \"$searchQuery\"", color = textGray)
                 }
             } else {
                 LazyColumn(
@@ -314,6 +475,25 @@ fun LoanGroupCard(
     onClick: () -> Unit
 ) {
     val textGray = Color(0xFF585858)
+    
+    // Determine status color for history items
+    val statusColor = if (isHistory) {
+        when (groupedItem.status) {
+            "Selesai" -> Color(0xFF4CAF50) // Green for on-time
+            "Terlambat" -> Color(0xFFE53935) // Red for late
+            else -> Color(0xFF4CAF50) // Default green
+        }
+    } else {
+        StoraYellowButton // Yellow for active loans
+    }
+    
+    val statusText = if (isHistory) {
+        when (groupedItem.status) {
+            "Selesai" -> "Tepat Waktu"
+            "Terlambat" -> "Terlambat"
+            else -> "Selesai"
+        }
+    } else null
 
     Card(
         modifier = Modifier
@@ -329,7 +509,7 @@ fun LoanGroupCard(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(16.dp)
-                    .background(if (isHistory) Color(0xFF4CAF50) else StoraYellowButton)
+                    .background(statusColor)
             )
 
             // Content
@@ -339,13 +519,38 @@ fun LoanGroupCard(
                     .weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
-                // Nama Peminjam
-                Text(
-                    text = groupedItem.borrower ?: "-",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = StoraBlueDark
-                )
+                // Row with borrower name and status badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Nama Peminjam
+                    Text(
+                        text = groupedItem.borrower ?: "-",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = StoraBlueDark,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Status badge for history
+                    if (isHistory && statusText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = statusColor.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = statusText,
+                                color = statusColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(6.dp))
                 
                 // Tanggal Peminjaman

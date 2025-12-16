@@ -152,11 +152,25 @@ interface ApiService {
         @Path("id") id: Int
     ): Response<LoanApiResponse<LoanApiModel>>
 
-    // Create new peminjaman
+    // Create new peminjaman (JSON only)
     @POST("peminjaman")
     suspend fun createPeminjaman(
         @Header("Authorization") token: String,
         @Body request: LoanCreateRequest
+    ): Response<LoanApiResponse<LoanApiModel>>
+
+    // Create new peminjaman with photos (Multipart)
+    @Multipart
+    @POST("peminjaman/with-photos")
+    suspend fun createPeminjamanWithPhotos(
+        @Header("Authorization") token: String,
+        @Part("Nama_Peminjam") namaPeminjam: RequestBody,
+        @Part("NoHP_Peminjam") noHpPeminjam: RequestBody,
+        @Part("Tanggal_Pinjam") tanggalPinjam: RequestBody,
+        @Part("Tanggal_Kembali") tanggalKembali: RequestBody,
+        @Part("ID_User") idUser: RequestBody,
+        @Part("barangList") barangList: RequestBody,
+        @Part photos: List<MultipartBody.Part>?
     ): Response<LoanApiResponse<LoanApiModel>>
 
     // Update peminjaman status
@@ -172,6 +186,24 @@ interface ApiService {
     suspend fun getPeminjamanStats(
         @Header("Authorization") token: String
     ): Response<LoanApiResponse<Any>>
+
+    // Delete peminjaman
+    @DELETE("peminjaman/{id}")
+    suspend fun deletePeminjaman(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<LoanApiResponse<Any>>
+
+    // Upload return photos for peminjaman
+    @Multipart
+    @PATCH("peminjaman/{id}/return-photos")
+    suspend fun uploadReturnPhotos(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Part("photoMapping") photoMapping: RequestBody,
+        @Part photos: List<MultipartBody.Part>?
+    ): Response<LoanApiResponse<LoanApiModel>>
+
 
     // ==================== NOTIFICATION ENDPOINTS ====================
 

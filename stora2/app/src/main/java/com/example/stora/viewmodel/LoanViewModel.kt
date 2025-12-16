@@ -37,17 +37,45 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
     private val _loanHistory = MutableStateFlow<List<LoanWithItems>>(emptyList())
     val loanHistory: StateFlow<List<LoanWithItems>> = _loanHistory.asStateFlow()
 
+    private val _unsyncedCount = MutableStateFlow(0)
+    val unsyncedCount: StateFlow<Int> = _unsyncedCount.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    // Server availability state - updated based on actual API calls
+    private val _isServerAvailable = MutableStateFlow(true)
+    val isServerAvailable: StateFlow<Boolean> = _isServerAvailable.asStateFlow()
+
     init {
         val database = AppDatabase.getDatabase(application)
         val apiService = ApiConfig.provideApiService()
-        loanRepository = LoanRepository(database.loanDao(), apiService, application)
+        loanRepository = LoanRepository(database.loanDao(), database.inventoryDao(), apiService, application)
 
         // Load loans from Room (local data first for fast loading)
         loadActiveLoans()
         loadLoanHistory()
+        updateUnsyncedCount()
         
-        // Sync from server on initialization (app start/resume)
-        syncFromServer()
+        // Sync from server on initialization if online
+        if (isOnline()) {
+            checkServerAndSync()
+        } else {
+            _isServerAvailable.value = false
+        }
+    }
+
+    // Check server availability and sync
+    private fun checkServerAndSync() {
+        viewModelScope.launch {
+            try {
+                syncFromServer()
+                _isServerAvailable.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Server not available: ${e.message}")
+                _isServerAvailable.value = false
+            }
+        }
     }
 
     private fun loadActiveLoans() {
@@ -82,12 +110,18 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         // Remove items that have roomLoanId (Room-managed items) and rebuild
         targetList.removeAll { it.roomLoanId != null }
         
+        // Build a set of existing item IDs to prevent any duplicates
+        val existingItemIds = targetList.map { it.roomItemId }.toSet()
+        
         // Add all items from Room
         loans.forEach { loanWithItems ->
             val loan = loanWithItems.loan
             val items = loanWithItems.items
             
             items.forEach { item ->
+                // Skip if this item already exists (extra safety check)
+                if (existingItemIds.contains(item.id)) return@forEach
+                
                 val loanItem = com.example.stora.data.LoanItem(
                     id = item.id.hashCode(),
                     groupId = loan.id.hashCode(),
@@ -99,6 +133,7 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
                     borrowDate = loan.tanggalPinjam,
                     returnDate = loan.tanggalKembali,
                     actualReturnDate = loan.tanggalDikembalikan,
+                    status = loan.status,
                     imageUri = item.imageUri,
                     returnImageUri = item.returnImageUri,
                     roomLoanId = loan.id,
@@ -126,15 +161,18 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
                 result.fold(
                     onSuccess = { (toServer, fromServer) ->
                         _syncStatus.value = "Sinkronisasi berhasil: $toServer ke server, $fromServer dari server"
+                        _isServerAvailable.value = true
                         Log.d(TAG, "Sync completed: $toServer to server, $fromServer from server")
                     },
                     onFailure = { error ->
                         _syncStatus.value = "Gagal sinkronisasi: ${error.message}"
+                        _isServerAvailable.value = false
                         Log.e(TAG, "Sync failed", error)
                     }
                 )
             } catch (e: Exception) {
                 _syncStatus.value = "Error: ${e.message}"
+                _isServerAvailable.value = false
                 Log.e(TAG, "Sync exception", e)
             } finally {
                 _isSyncing.value = false
@@ -264,5 +302,70 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
     // Clear sync status
     fun clearSyncStatus() {
         _syncStatus.value = null
+    }
+
+    // Clear error
+    fun clearError() {
+        _error.value = null
+    }
+
+    // Check if device is online
+    fun isOnline(): Boolean {
+        return loanRepository.isOnline()
+    }
+
+    // Update unsynced count
+    private fun updateUnsyncedCount() {
+        viewModelScope.launch {
+            try {
+                val count = loanRepository.getUnsyncedLoansCount()
+                _unsyncedCount.value = count
+                Log.d(TAG, "Unsynced loans count: $count")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting unsynced count", e)
+            }
+        }
+    }
+
+    // Sync data (both directions)
+    fun syncData() {
+        if (_isSyncing.value) {
+            Log.d(TAG, "Sync already in progress")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _isSyncing.value = true
+                _syncStatus.value = "Sinkronisasi dimulai..."
+
+                if (!isOnline()) {
+                    _syncStatus.value = "Offline - Data disimpan lokal"
+                    return@launch
+                }
+
+                val result = loanRepository.performFullSync()
+                result.fold(
+                    onSuccess = { (toServer, fromServer) ->
+                        _syncStatus.value = "Sinkronisasi berhasil: $toServer ke server, $fromServer dari server"
+                        updateUnsyncedCount()
+                    },
+                    onFailure = { error ->
+                        _syncStatus.value = "Gagal sinkronisasi: ${error.message}"
+                        _error.value = error.message
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during sync", e)
+                _syncStatus.value = "Error: ${e.message}"
+                _error.value = e.message
+            } finally {
+                _isSyncing.value = false
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(3000)
+                    _syncStatus.value = null
+                }
+            }
+        }
     }
 }

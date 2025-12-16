@@ -26,13 +26,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.stora.data.LoansData
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellow
+import com.example.stora.viewmodel.LoanViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -40,10 +43,14 @@ import java.util.*
 @Composable
 fun DetailLoanHistoryScreen(
     navController: NavHostController,
-    loanId: Int
+    loanId: Int,
+    loanViewModel: LoanViewModel = viewModel()
 ) {
     var isVisible by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val isLoading by loanViewModel.isLoading.collectAsState()
     
     val loan = remember(loanId) {
         LoansData.loansHistory.find { it.id == loanId }
@@ -493,19 +500,53 @@ fun DetailLoanHistoryScreen(
                         // Delete Button
                         Button(
                             onClick = {
-                                // Delete all items in the group
-                                loanGroup.forEach { item ->
-                                    LoansData.deleteLoanHistory(item.id)
+                                // Get the Room loan ID from the first item
+                                val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                                
+                                if (roomLoanId != null) {
+                                    // Use ViewModel to delete from both server and Room
+                                    loanViewModel.deleteLoanHistory(
+                                        loanId = roomLoanId,
+                                        onSuccess = {
+                                            // Also remove from in-memory LoansData
+                                            loanGroup.forEach { item ->
+                                                LoansData.deleteLoanHistory(item.id)
+                                            }
+                                            showDeleteDialog = false
+                                            
+                                            // Set result for previous screen to show snackbar
+                                            navController.previousBackStackEntry
+                                                ?.savedStateHandle
+                                                ?.set("history_deleted", true)
+                                            
+                                            // Navigate back
+                                            navController.popBackStack()
+                                        },
+                                        onError = { error ->
+                                            showDeleteDialog = false
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Error: $error",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Fallback: only delete from in-memory LoansData
+                                    loanGroup.forEach { item ->
+                                        LoansData.deleteLoanHistory(item.id)
+                                    }
+                                    showDeleteDialog = false
+                                    
+                                    // Set result for previous screen to show snackbar
+                                    navController.previousBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set("history_deleted", true)
+                                    
+                                    // Navigate back
+                                    navController.popBackStack()
                                 }
-                                showDeleteDialog = false
-                                
-                                // Set result for previous screen to show snackbar
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("history_deleted", true)
-                                
-                                // Navigate back
-                                navController.popBackStack()
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -513,14 +554,23 @@ fun DetailLoanHistoryScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFE53935)
-                            )
+                            ),
+                            enabled = !isLoading
                         ) {
-                            Text(
-                                text = "Hapus",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = StoraWhite
-                            )
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = StoraWhite,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "Hapus",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StoraWhite
+                                )
+                            }
                         }
                     }
                 }

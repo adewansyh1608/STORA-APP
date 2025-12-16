@@ -62,14 +62,14 @@ PeminjamanBarang.belongsTo(Inventaris, {
   as: 'inventaris',
 });
 
-// Peminjaman <-> FotoPeminjaman (One-to-Many)
-Peminjaman.hasMany(FotoPeminjaman, {
-  foreignKey: 'ID_Peminjaman',
+// PeminjamanBarang <-> FotoPeminjaman (One-to-Many)
+PeminjamanBarang.hasMany(FotoPeminjaman, {
+  foreignKey: 'ID_Peminjaman_Barang',
   as: 'foto',
 });
-FotoPeminjaman.belongsTo(Peminjaman, {
-  foreignKey: 'ID_Peminjaman',
-  as: 'peminjaman',
+FotoPeminjaman.belongsTo(PeminjamanBarang, {
+  foreignKey: 'ID_Peminjaman_Barang',
+  as: 'peminjaman_barang',
 });
 
 // User <-> Notifikasi (One-to-Many)

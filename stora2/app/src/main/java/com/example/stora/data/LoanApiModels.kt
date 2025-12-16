@@ -63,7 +63,20 @@ data class LoanBarangApiModel(
     @SerializedName("Jumlah")
     val jumlah: Int?,
     @SerializedName("inventaris")
-    val inventaris: LoanInventarisApiModel? = null
+    val inventaris: LoanInventarisApiModel? = null,
+    @SerializedName("foto")
+    val foto: List<FotoApiModel>? = null
+)
+
+data class FotoApiModel(
+    @SerializedName("ID_Foto_Peminjaman")
+    val idFotoPeminjaman: Int?,
+    @SerializedName("ID_Peminjaman_Barang")
+    val idPeminjamanBarang: Int?,
+    @SerializedName("Foto_Peminjaman")
+    val fotoPeminjaman: String?,
+    @SerializedName("Foto_Pengembalian")
+    val fotoPengembalian: String?
 )
 
 data class LoanInventarisApiModel(
@@ -142,11 +155,22 @@ fun LoanApiModel.toLoanEntity(existingId: String? = null, userId: Int): LoanEnti
  * Convert API barang model to LoanItemEntity
  * Uses serverId to generate consistent ID for proper sync behavior
  */
-fun LoanBarangApiModel.toLoanItemEntity(loanId: String): LoanItemEntity {
+fun LoanBarangApiModel.toLoanItemEntity(loanId: String, baseUrl: String = ""): LoanItemEntity {
     // Use a consistent ID based on server ID to prevent duplicates on sync
     // If no serverId, fallback to UUID (for locally created items)
     val itemId = idPeminjamanBarang?.let { "server_item_$it" } 
         ?: java.util.UUID.randomUUID().toString()
+    
+    // Get first foto entry for this item (should be one per item now with FK change)
+    val fotoItem = foto?.firstOrNull()
+    
+    // Build full URL for photos (prepend base URL if not already absolute)
+    val borrowPhotoUrl = fotoItem?.fotoPeminjaman?.let { 
+        if (it.startsWith("http")) it else "$baseUrl$it"
+    }
+    val returnPhotoUrl = fotoItem?.fotoPengembalian?.let {
+        if (it.startsWith("http")) it else "$baseUrl$it"
+    }
     
     return LoanItemEntity(
         id = itemId,
@@ -155,7 +179,9 @@ fun LoanBarangApiModel.toLoanItemEntity(loanId: String): LoanItemEntity {
         namaBarang = inventaris?.namaBarang ?: "",
         kodeBarang = inventaris?.kodeBarang ?: "",
         jumlah = jumlah ?: 0,
-        serverId = idPeminjamanBarang
+        serverId = idPeminjamanBarang,
+        imageUri = borrowPhotoUrl,
+        returnImageUri = returnPhotoUrl
     )
 }
 

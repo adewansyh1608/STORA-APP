@@ -8,10 +8,10 @@ interface LoanDao {
     
     // ==================== LOAN QUERIES ====================
     
-    @Query("SELECT * FROM loans WHERE userId = :userId AND status != 'Selesai' ORDER BY lastModified DESC")
+    @Query("SELECT * FROM loans WHERE userId = :userId AND status NOT IN ('Selesai', 'Terlambat') ORDER BY lastModified DESC")
     fun getActiveLoans(userId: Int): Flow<List<LoanEntity>>
     
-    @Query("SELECT * FROM loans WHERE userId = :userId AND status = 'Selesai' ORDER BY lastModified DESC")
+    @Query("SELECT * FROM loans WHERE userId = :userId AND status IN ('Selesai', 'Terlambat') ORDER BY lastModified DESC")
     fun getLoanHistory(userId: Int): Flow<List<LoanEntity>>
     
     @Query("SELECT * FROM loans WHERE userId = :userId ORDER BY lastModified DESC")
@@ -72,6 +72,9 @@ interface LoanDao {
 
     @Query("UPDATE loan_items SET returnImageUri = :returnImageUri WHERE id = :itemId")
     suspend fun updateLoanItemReturnImage(itemId: String, returnImageUri: String?)
+
+    @Query("UPDATE loan_items SET serverId = :serverId WHERE id = :itemId")
+    suspend fun updateLoanItemServerId(itemId: String, serverId: Int)
 
     // ==================== COMBINED QUERIES ====================
     

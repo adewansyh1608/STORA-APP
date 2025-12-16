@@ -93,4 +93,8 @@ interface InventoryDao {
     // Check if item exists by noinv
     @Query("SELECT COUNT(*) FROM inventory_items WHERE noinv = :noinv AND isDeleted = 0")
     suspend fun isNoinvExists(noinv: String): Int
+
+    // Get inventory item by code (noinv) - synchronous for sync operations
+    @Query("SELECT * FROM inventory_items WHERE noinv = :code AND isDeleted = 0 LIMIT 1")
+    suspend fun getInventoryItemByCodeSync(code: String): InventoryItem?
 }

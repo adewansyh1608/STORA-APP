@@ -5,12 +5,16 @@ const fs = require('fs');
 // Ensure uploads directories exist
 const uploadsDir = path.join(__dirname, '../../public/uploads/inventaris');
 const profileUploadsDir = path.join(__dirname, '../../public/uploads/profiles');
+const peminjamanUploadsDir = path.join(__dirname, '../../public/uploads/peminjaman');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 if (!fs.existsSync(profileUploadsDir)) {
   fs.mkdirSync(profileUploadsDir, { recursive: true });
+}
+if (!fs.existsSync(peminjamanUploadsDir)) {
+  fs.mkdirSync(peminjamanUploadsDir, { recursive: true });
 }
 
 // Configure storage for inventory
@@ -38,6 +42,18 @@ const profileStorage = multer.diskStorage({
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname) || '.jpg';
     cb(null, `profile-${userId}-${uniqueSuffix}${ext}`);
+  }
+});
+
+// Configure storage for peminjaman photos
+const peminjamanStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, peminjamanUploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `peminjaman-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -91,4 +107,14 @@ const profileUpload = multer({
   fileFilter: fileFilter
 });
 
-module.exports = { upload, profileUpload };
+// Configure multer for peminjaman photos
+const peminjamanUpload = multer({
+  storage: peminjamanStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+  fileFilter: fileFilter
+});
+
+module.exports = { upload, profileUpload, peminjamanUpload };
+
