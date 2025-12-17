@@ -1,6 +1,6 @@
 const cron = require('node-cron');
-const { ReminderSetting, User, Notifikasi, Peminjaman } = require('../models');
-const { sendPushNotification } = require('./firebaseAdmin');
+const { ReminderSetting, User, Notifikasi, Peminjaman, UserDevice } = require('../models');
+const { sendPushNotification, sendMultipleNotifications } = require('./firebaseAdmin');
 const { Op } = require('sequelize');
 
 class ReminderScheduler {
@@ -48,6 +48,46 @@ class ReminderScheduler {
         }
     }
 
+    /**
+     * Send notification to all active devices for a user
+     * @param {number} userId - The user ID
+     * @param {string} title - Notification title
+     * @param {string} body - Notification body
+     * @param {object} data - Additional data to send
+     * @returns {object} Result with success count and failure count
+     */
+    async sendToAllUserDevices(userId, title, body, data = {}) {
+        try {
+            // Get all active device tokens for this user
+            const devices = await UserDevice.findAll({
+                where: {
+                    ID_User: userId,
+                    Is_Active: true,
+                    FCM_Token: { [Op.ne]: null }
+                }
+            });
+
+            if (devices.length === 0) {
+                console.log(`⚠ No active devices found for user ${userId}`);
+                return { success: false, error: 'No active devices' };
+            }
+
+            const tokens = devices.map(d => d.FCM_Token).filter(t => t);
+            console.log(`📱 Sending notification to ${tokens.length} devices for user ${userId}`);
+
+            if (tokens.length === 1) {
+                // Single device - use single notification
+                return await sendPushNotification(tokens[0], title, body, data);
+            } else {
+                // Multiple devices - use multicast
+                return await sendMultipleNotifications(tokens, title, body, data);
+            }
+        } catch (error) {
+            console.error(`Error sending to all user devices for user ${userId}:`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async checkPeriodicReminders(now) {
         try {
             // Find all active periodic reminders
@@ -70,8 +110,9 @@ class ReminderScheduler {
                 if (monthsSinceLastNotified >= reminder.periodic_months) {
                     console.log(`Sending periodic reminder ${reminder.ID_Reminder} (${monthsSinceLastNotified} months since last)`);
 
-                    const result = await sendPushNotification(
-                        reminder.fcm_token,
+                    // Send to ALL user devices (multi-device support)
+                    const result = await this.sendToAllUserDevices(
+                        reminder.ID_User,
                         reminder.title || 'Pengingat Pengecekan Inventory',
                         `Sudah waktunya untuk melakukan pengecekan inventory! (Setiap ${reminder.periodic_months} bulan)`,
                         {
@@ -80,10 +121,10 @@ class ReminderScheduler {
                         }
                     );
 
-                    if (result.success) {
+                    if (result.success || result.successCount > 0) {
                         // Update last_notified timestamp
                         await reminder.update({ last_notified: now });
-                        console.log(`✓ Periodic reminder ${reminder.ID_Reminder} sent and updated`);
+                        console.log(`✓ Periodic reminder ${reminder.ID_Reminder} sent to all devices and updated`);
                     }
                 }
             }
@@ -114,8 +155,9 @@ class ReminderScheduler {
             for (const reminder of customReminders) {
                 console.log(`Sending custom reminder ${reminder.ID_Reminder}, scheduled for ${reminder.scheduled_datetime}`);
 
-                const result = await sendPushNotification(
-                    reminder.fcm_token,
+                // Send to ALL user devices (multi-device support)
+                const result = await this.sendToAllUserDevices(
+                    reminder.ID_User,
                     reminder.title || 'Pengingat Pengecekan Inventory',
                     'Cek Inventory Anda',
                     {
@@ -124,7 +166,7 @@ class ReminderScheduler {
                     }
                 );
 
-                if (result.success) {
+                if (result.success || result.successCount > 0) {
                     // Save notification history to database
                     await Notifikasi.create({
                         Judul: reminder.title || 'Pengingat Pengecekan Inventory',
@@ -138,7 +180,7 @@ class ReminderScheduler {
 
                     // Delete the custom reminder after successful notification (one-time)
                     await reminder.destroy();
-                    console.log(`✓ Custom reminder ${reminder.ID_Reminder} sent and deleted`);
+                    console.log(`✓ Custom reminder ${reminder.ID_Reminder} sent to all devices and deleted`);
                 }
             }
         } catch (error) {
@@ -246,8 +288,9 @@ class ReminderScheduler {
 
             console.log(`  📤 Sending morning reminder for loan ${loan.ID_Peminjaman}...`);
 
-            const result = await sendPushNotification(
-                loan.user.FCM_Token,
+            // Send to ALL user devices (multi-device support)
+            const result = await this.sendToAllUserDevices(
+                loan.ID_User,
                 'Deadline Pengembalian',
                 morningMessage,
                 {
@@ -262,14 +305,14 @@ class ReminderScheduler {
                 Judul: 'Deadline Pengembalian',
                 Pesan: morningMessage,
                 Tanggal: now,
-                Status: result.success ? 'Terkirim' : 'Gagal',
+                Status: (result.success || result.successCount > 0) ? 'Terkirim' : 'Gagal',
                 ID_User: loan.ID_User,
                 ID_Peminjaman: loan.ID_Peminjaman,
                 isSynced: true
             });
 
-            if (result.success) {
-                console.log(`  ✓ Morning deadline reminder sent for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
+            if (result.success || result.successCount > 0) {
+                console.log(`  ✓ Morning deadline reminder sent to all devices for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
             } else {
                 console.log(`  ⚠ Morning reminder saved to DB but FCM failed for loan ${loan.ID_Peminjaman}`);
             }
@@ -304,8 +347,9 @@ class ReminderScheduler {
 
             console.log(`  📤 Sending deadline reminder for loan ${loan.ID_Peminjaman}...`);
 
-            const result = await sendPushNotification(
-                loan.user.FCM_Token,
+            // Send to ALL user devices (multi-device support)
+            const result = await this.sendToAllUserDevices(
+                loan.ID_User,
                 'Deadline Pengembalian',
                 overdueMessage,
                 {
@@ -320,14 +364,14 @@ class ReminderScheduler {
                 Judul: 'Deadline Pengembalian',
                 Pesan: overdueMessage,
                 Tanggal: now,
-                Status: result.success ? 'Terkirim' : 'Gagal',
+                Status: (result.success || result.successCount > 0) ? 'Terkirim' : 'Gagal',
                 ID_User: loan.ID_User,
                 ID_Peminjaman: loan.ID_Peminjaman,
                 isSynced: true
             });
 
-            if (result.success) {
-                console.log(`  ✓ Deadline reminder sent for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
+            if (result.success || result.successCount > 0) {
+                console.log(`  ✓ Deadline reminder sent to all devices for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
             } else {
                 console.log(`  ⚠ Deadline reminder saved to DB but FCM failed for loan ${loan.ID_Peminjaman}`);
             }

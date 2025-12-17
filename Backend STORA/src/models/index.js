@@ -9,6 +9,7 @@ const PeminjamanBarang = require('./PeminjamanBarang');
 const FotoPeminjaman = require('./FotoPeminjaman');
 const Notifikasi = require('./Notifikasi');
 const ReminderSetting = require('./ReminderSetting');
+const UserDevice = require('./UserDevice');
 
 // Define associations
 
@@ -92,6 +93,16 @@ ReminderSetting.belongsTo(User, {
   as: 'user',
 });
 
+// User <-> UserDevice (One-to-Many)
+User.hasMany(UserDevice, {
+  foreignKey: 'ID_User',
+  as: 'devices',
+});
+UserDevice.belongsTo(User, {
+  foreignKey: 'ID_User',
+  as: 'user',
+});
+
 // Peminjaman <-> Notifikasi (One-to-Many)
 Peminjaman.hasMany(Notifikasi, {
   foreignKey: 'ID_Peminjaman',
@@ -113,5 +124,6 @@ module.exports = {
   FotoPeminjaman,
   Notifikasi,
   ReminderSetting,
+  UserDevice,
 };
 

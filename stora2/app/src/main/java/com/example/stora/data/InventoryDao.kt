@@ -97,4 +97,16 @@ interface InventoryDao {
     // Get inventory item by code (noinv) - synchronous for sync operations
     @Query("SELECT * FROM inventory_items WHERE noinv = :code AND isDeleted = 0 LIMIT 1")
     suspend fun getInventoryItemByCodeSync(code: String): InventoryItem?
+
+    // Delete all items for a specific user (for fresh sync)
+    @Query("DELETE FROM inventory_items WHERE userId = :userId")
+    suspend fun deleteAllItemsForUser(userId: Int)
+
+    // Get all items including deleted for sync operations
+    @Query("SELECT * FROM inventory_items WHERE userId = :userId ORDER BY lastModified DESC")
+    suspend fun getAllItemsIncludingDeleted(userId: Int): List<InventoryItem>
+
+    // Get items that are not soft-deleted and have serverId (confirmed on server)
+    @Query("SELECT * FROM inventory_items WHERE userId = :userId AND isDeleted = 0 AND serverId IS NOT NULL")
+    suspend fun getSyncedItemsWithServerId(userId: Int): List<InventoryItem>
 }

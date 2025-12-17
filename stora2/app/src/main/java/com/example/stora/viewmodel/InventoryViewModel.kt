@@ -8,6 +8,7 @@ import com.example.stora.data.AppDatabase
 import com.example.stora.data.InventoryItem
 import com.example.stora.network.ApiConfig
 import com.example.stora.repository.InventoryRepository
+import com.example.stora.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,12 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         apiService = apiService,
         context = application
     )
+    
+    // Network connectivity observer for auto-sync
+    private val networkObserver = NetworkConnectivityObserver(application)
+    
+    private val _isOnline = MutableStateFlow(false)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     private val _inventoryItems = MutableStateFlow<List<InventoryItem>>(emptyList())
     val inventoryItems: StateFlow<List<InventoryItem>> = _inventoryItems.asStateFlow()
@@ -52,9 +59,39 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         loadInventoryItems()
         updateUnsyncedCount()
+        observeNetworkChanges()
+        
         // Auto sync on initialization if online
         if (repository.isOnline()) {
             syncData()
+        }
+    }
+    
+    /**
+     * Observe network connectivity changes and auto-sync when network becomes available
+     */
+    private fun observeNetworkChanges() {
+        viewModelScope.launch {
+            networkObserver.observe().collectLatest { isConnected ->
+                val wasOffline = !_isOnline.value
+                _isOnline.value = isConnected
+                
+                Log.d(TAG, "Network status changed: isConnected=$isConnected, wasOffline=$wasOffline")
+                
+                // Auto-sync when coming back online and there are unsynced items
+                if (isConnected && wasOffline) {
+                    val unsyncedItems = _unsyncedCount.value
+                    if (unsyncedItems > 0) {
+                        Log.d(TAG, "Back online with $unsyncedItems unsynced items, starting auto-sync...")
+                        _syncStatus.value = "Kembali online, menyinkronkan $unsyncedItems item..."
+                        syncData()
+                    } else {
+                        // Still sync from server to get any new data from other devices
+                        Log.d(TAG, "Back online, syncing from server to get latest data...")
+                        syncFromServer()
+                    }
+                }
+            }
         }
     }
 

@@ -58,9 +58,26 @@ class InventoryRepository(
         }
     }
 
+    /**
+     * Check if the photo URL is from the server (not a local file URI)
+     * Server photos start with http:// or https:// or /uploads/
+     */
+    private fun isPhotoFromServer(photoUri: String?): Boolean {
+        if (photoUri == null) return false
+        return photoUri.startsWith("http://") || 
+               photoUri.startsWith("https://") || 
+               photoUri.startsWith("/uploads/")
+    }
+
     
     private fun createPhotoPart(photoUri: String?): MultipartBody.Part? {
         if (photoUri == null) return null
+        
+        // Skip if photo is already from server (no need to re-upload)
+        if (isPhotoFromServer(photoUri)) {
+            Log.d(TAG, "Photo is from server, skipping upload: $photoUri")
+            return null
+        }
         
         return try {
             val uri = Uri.parse(photoUri)
@@ -123,6 +140,77 @@ class InventoryRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
+                val authHeader = tokenManager.getAuthHeader()
+                
+                // If online and have auth, try to create on server first
+                if (authHeader != null && isOnline()) {
+                    Log.d(TAG, "Online mode: trying to create item on server first")
+                    
+                    val request = item.toApiRequest(userId)
+                    
+                    try {
+                        val response = if (item.photoUri != null && !isPhotoFromServer(item.photoUri)) {
+                            val fotoPart = createPhotoPart(item.photoUri)
+                            apiService.createInventoryWithPhoto(
+                                token = authHeader,
+                                namaBarang = item.name.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                kodeBarang = item.noinv.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                jumlah = item.quantity.toString().toRequestBody("text/plain".toMediaTypeOrNull()),
+                                kategori = item.category.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                lokasi = item.location.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                kondisi = item.condition.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                tanggalPengadaan = request.tanggalPengadaan.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                deskripsi = item.description?.toRequestBody("text/plain".toMediaTypeOrNull()),
+                                foto = fotoPart
+                            )
+                        } else {
+                            apiService.createInventory(
+                                token = authHeader,
+                                inventoryRequest = request
+                            )
+                        }
+                        
+                        Log.d(TAG, "Server response code: ${response.code()}")
+                        
+                        if (response.isSuccessful && response.body()?.success == true) {
+                            // Server accepted - now save to Room with serverId
+                            val serverId = response.body()?.data?.idInventaris
+                            val serverPhotoUrl = response.body()?.data?.foto?.firstOrNull()?.foto
+                            
+                            val itemToSave = item.copy(
+                                userId = userId,
+                                serverId = serverId,
+                                photoUri = serverPhotoUrl ?: item.photoUri,
+                                needsSync = false,
+                                isSynced = true,
+                                lastModified = System.currentTimeMillis()
+                            )
+                            inventoryDao.insertInventoryItem(itemToSave)
+                            Log.d(TAG, "✓ Item created on server and saved locally: ${item.name}")
+                            return@withContext Result.success(itemToSave)
+                        } else {
+                            // Server rejected - return error with message
+                            val errorBody = response.errorBody()?.string()
+                            Log.e(TAG, "Server rejected: $errorBody")
+                            
+                            // Parse error message from server response
+                            val errorMessage = try {
+                                val jsonError = org.json.JSONObject(errorBody ?: "{}")
+                                jsonError.optString("message", "Gagal menyimpan data ke server")
+                            } catch (e: Exception) {
+                                "Gagal menyimpan data ke server (${response.code()})"
+                            }
+                            
+                            return@withContext Result.failure(Exception(errorMessage))
+                        }
+                    } catch (networkError: Exception) {
+                        Log.w(TAG, "Network error, will save locally for later sync: ${networkError.message}")
+                        // Network error - fall through to save locally
+                    }
+                }
+                
+                // Offline mode or network error - save locally with needsSync flag
+                Log.d(TAG, "Saving item locally for later sync")
                 val itemWithSyncFlag = item.copy(
                     userId = userId,
                     needsSync = true,
@@ -130,7 +218,7 @@ class InventoryRepository(
                     lastModified = System.currentTimeMillis()
                 )
                 inventoryDao.insertInventoryItem(itemWithSyncFlag)
-                Log.d(TAG, "Item inserted locally: ${item.name}")
+                Log.d(TAG, "Item inserted locally (will sync later): ${item.name}")
                 Result.success(itemWithSyncFlag)
             } catch (e: Exception) {
                 Log.e(TAG, "Error inserting item locally", e)
@@ -223,6 +311,33 @@ class InventoryRepository(
                         val serverItems = responseBody.data ?: emptyList()
                         Log.d(TAG, "Received ${serverItems.size} items from server")
 
+                        // Get all server IDs from response
+                        val serverItemIds = serverItems.mapNotNull { it.idInventaris }.toSet()
+                        Log.d(TAG, "Server item IDs: $serverItemIds")
+
+                        // Get all local items that have been synced (have serverId)
+                        val localSyncedItems = inventoryDao.getSyncedItemsWithServerId(userId)
+                        Log.d(TAG, "Local synced items count: ${localSyncedItems.size}")
+
+                        // Find items that exist locally but NOT on server (deleted on server)
+                        val itemsToDelete = localSyncedItems.filter { localItem ->
+                            localItem.serverId != null && localItem.serverId !in serverItemIds
+                        }
+
+                        // Delete local items that were deleted on server
+                        var deletedCount = 0
+                        itemsToDelete.forEach { item ->
+                            try {
+                                inventoryDao.deleteInventoryItem(item)
+                                deletedCount++
+                                Log.d(TAG, "✓ Deleted local item (removed from server): ${item.name}")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error deleting local item ${item.name}", e)
+                            }
+                        }
+                        Log.d(TAG, "Deleted $deletedCount items that were removed from server")
+
+                        // Now add/update items from server
                         var syncedCount = 0
                         serverItems.forEach { apiModel ->
                             try {
@@ -246,7 +361,7 @@ class InventoryRepository(
                             }
                         }
 
-                        Log.d(TAG, "✓ Sync from server completed: $syncedCount items")
+                        Log.d(TAG, "✓ Sync from server completed: $syncedCount items synced, $deletedCount items deleted")
                         Result.success(syncedCount)
                     } else {
                         val errorMsg = responseBody?.message ?: "Sync failed with success=false"

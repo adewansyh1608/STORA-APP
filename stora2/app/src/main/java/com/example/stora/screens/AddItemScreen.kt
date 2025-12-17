@@ -136,6 +136,7 @@ fun AddItemForm(
     var showPhotoOptions by remember { mutableStateOf(false) }
     var showConditionDropdown by remember { mutableStateOf(false) } // For dropdown
     var isError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     // Condition options matching database ENUM
     val conditionOptions = listOf("Baik", "Rusak Ringan", "Rusak Berat")
@@ -197,22 +198,22 @@ fun AddItemForm(
     ) {
         StoraFormField(
             value = name,
-            onValueChange = { name = it; isError = false },
+            onValueChange = { name = it; isError = false; errorMessage = "" },
             label = "Nama Inventaris"
         )
         StoraFormField(
             value = noinv,
-            onValueChange = { noinv = it; isError = false },
+            onValueChange = { noinv = it; isError = false; errorMessage = "" },
             label = "Nomor Inventaris"
         )
         QuantityInputField(
             value = quantity,
-            onValueChange = { quantity = it; isError = false },
+            onValueChange = { quantity = it; isError = false; errorMessage = "" },
             label = "Jumlah"
         )
         StoraFormField(
             value = category,
-            onValueChange = { category = it; isError = false },
+            onValueChange = { category = it; isError = false; errorMessage = "" },
             label = "Kategori"
         )
         
@@ -260,6 +261,7 @@ fun AddItemForm(
                                 condition = option
                                 showConditionDropdown = false
                                 isError = false
+                                errorMessage = ""
                             }
                         )
                     }
@@ -269,7 +271,7 @@ fun AddItemForm(
         
         StoraFormField(
             value = location,
-            onValueChange = { location = it; isError = false },
+            onValueChange = { location = it; isError = false; errorMessage = "" },
             label = "Lokasi"
         )
 
@@ -289,7 +291,7 @@ fun AddItemForm(
 
         StoraFormField(
             value = description,
-            onValueChange = { description = it; isError = false },
+            onValueChange = { description = it; isError = false; errorMessage = "" },
             label = "Deskripsi",
             singleLine = false,
             modifier = Modifier.height(120.dp)
@@ -297,9 +299,9 @@ fun AddItemForm(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isError) {
+        if (isError && errorMessage.isNotEmpty()) {
             Text(
-                text = "Semua kolom harus diisi!",
+                text = errorMessage,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -374,11 +376,26 @@ fun AddItemForm(
         Button(
             onClick = {
                 val qtyInt = quantity.toIntOrNull()
-                if (name.isNotBlank() && noinv.isNotBlank() && qtyInt != null && category.isNotBlank() && condition.isNotBlank() && location.isNotBlank() && description.isNotBlank() && date.isNotBlank()) {
+                
+                // Validate all required fields
+                val emptyFields = mutableListOf<String>()
+                if (name.isBlank()) emptyFields.add("Nama Inventaris")
+                if (noinv.isBlank()) emptyFields.add("Nomor Inventaris")
+                if (qtyInt == null || quantity.isBlank()) emptyFields.add("Jumlah")
+                if (category.isBlank()) emptyFields.add("Kategori")
+                if (condition.isBlank()) emptyFields.add("Kondisi")
+                if (location.isBlank()) emptyFields.add("Lokasi")
+                if (date.isBlank()) emptyFields.add("Tanggal")
+                if (description.isBlank()) emptyFields.add("Deskripsi")
+                
+                if (emptyFields.isNotEmpty()) {
+                    isError = true
+                    errorMessage = "Harap lengkapi: ${emptyFields.joinToString(", ")}"
+                } else {
                     val newItem = InventoryItem(
                         name = name,
                         noinv = noinv,
-                        quantity = qtyInt,
+                        quantity = qtyInt!!,
                         category = category,
                         condition = condition,
                         location = location,
@@ -397,11 +414,12 @@ fun AddItemForm(
                         },
                         onError = { error ->
                             isError = true
+                            // Show backend error message (e.g., duplicate Kode_Barang)
+                            errorMessage = error
                         }
                     )
-                    isError = false
-                } else {
-                    isError = true
+                    // Note: Don't clear error here - it's an async call
+                    // Error will be cleared when user modifies any field
                 }
             },
             modifier = Modifier

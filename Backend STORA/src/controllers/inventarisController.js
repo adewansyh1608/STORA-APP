@@ -157,6 +157,62 @@ class InventarisController {
 
       const inventarisData = req.body;
 
+      // Validate required fields
+      const requiredFields = ['Nama_Barang', 'Kode_Barang', 'Jumlah', 'Kategori', 'Kondisi'];
+      const missingFields = requiredFields.filter(field => !inventarisData[field] || inventarisData[field].toString().trim() === '');
+
+      if (missingFields.length > 0) {
+        console.log('Missing required fields:', missingFields);
+        return res.status(400).json({
+          success: false,
+          message: `Data tidak lengkap. Harap lengkapi: ${missingFields.join(', ')}`,
+          missingFields: missingFields
+        });
+      }
+
+      // Normalize Kode_Barang for comparison (case-insensitive, remove leading zeros from number parts)
+      // Example: "HMSI/XX/2025/01" and "hmsi/xx/2025/1" should be treated as the same
+      const normalizeKodeBarang = (kode) => {
+        if (!kode) return '';
+        // Convert to lowercase and split by common delimiters
+        const parts = kode.toString().toLowerCase().split(/[\\/\-_]/);
+        // Remove leading zeros from purely numeric parts
+        const normalizedParts = parts.map(part => {
+          // Check if part is purely numeric
+          if (/^\d+$/.test(part)) {
+            return parseInt(part, 10).toString(); // Removes leading zeros
+          }
+          return part.trim();
+        });
+        // Join back with standard delimiter for comparison
+        return normalizedParts.join('/');
+      };
+
+      const kodeBarang = inventarisData.Kode_Barang.toString().trim();
+      const normalizedInputKode = normalizeKodeBarang(kodeBarang);
+      console.log(`Checking duplicate for Kode_Barang: "${kodeBarang}" (normalized: "${normalizedInputKode}")`);
+
+      // Get all inventory items for this user and check for normalized duplicates
+      const userItems = await Inventaris.findAll({
+        where: {
+          ID_User: req.user.id
+        },
+        attributes: ['ID_Inventaris', 'Kode_Barang']
+      });
+
+      const existingItem = userItems.find(item => {
+        const existingNormalized = normalizeKodeBarang(item.Kode_Barang);
+        return existingNormalized === normalizedInputKode;
+      });
+
+      if (existingItem) {
+        console.log(`✗ Duplicate Kode_Barang found: "${kodeBarang}" matches existing "${existingItem.Kode_Barang}"`);
+        return res.status(409).json({
+          success: false,
+          message: `Nomor Inventaris "${kodeBarang}" sudah ada (sama dengan "${existingItem.Kode_Barang}"). Silakan gunakan nomor yang berbeda.`,
+          code: 'DUPLICATE_KODE_BARANG'
+        });
+      }
 
       inventarisData.ID_User = req.user.id;
 
@@ -405,6 +461,58 @@ class InventarisController {
         },
       });
     } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // Get sync data - all items for a user (simplified without timestamp columns)
+  async getSyncData(req, res) {
+    try {
+      console.log('===== GET SYNC DATA REQUEST =====');
+      console.log('Query params:', req.query);
+      console.log('User from token:', req.user);
+
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const whereClause = {
+        ID_User: req.user.id
+      };
+
+      // Get all items for this user - the client will handle sync logic
+      const items = await Inventaris.findAll({
+        where: whereClause,
+        order: [['ID_Inventaris', 'DESC']],
+        include: [
+          {
+            association: 'user',
+            attributes: ['ID_User', 'Nama_User'],
+          },
+          {
+            association: 'foto',
+            attributes: ['ID_Foto_Inventaris', 'Foto'],
+          },
+        ],
+      });
+
+      console.log(`✓ Found ${items.length} items for sync`);
+      console.log('===================================');
+
+      res.status(200).json({
+        success: true,
+        data: items,
+        syncTimestamp: Date.now(),
+        message: `Found ${items.length} items`
+      });
+    } catch (error) {
+      console.error('✗ Error getting sync data:', error.message);
       res.status(500).json({
         success: false,
         message: error.message,

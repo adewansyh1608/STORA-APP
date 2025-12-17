@@ -1,12 +1,12 @@
-const { ReminderSetting, User, Notifikasi } = require('../models');
+const { ReminderSetting, User, Notifikasi, UserDevice } = require('../models');
 const { sendPushNotification } = require('../services/firebaseAdmin');
 const { validationResult } = require('express-validator');
 
 class NotificationController {
-    // Register FCM token for a user
+    // Register FCM token for a user (supports multiple devices)
     async registerToken(req, res) {
         try {
-            const { fcm_token } = req.body;
+            const { fcm_token, device_name } = req.body;
             const userId = req.user.id;
 
             if (!fcm_token) {
@@ -16,19 +16,42 @@ class NotificationController {
                 });
             }
 
-            // Save FCM token to User model for loan deadline notifications
+            // Find existing device entry for this user with this token
+            const existingDevice = await UserDevice.findOne({
+                where: { ID_User: userId, FCM_Token: fcm_token }
+            });
+
+            if (existingDevice) {
+                // Update existing device
+                await existingDevice.update({
+                    Device_Name: device_name || existingDevice.Device_Name || 'Unknown Device',
+                    Last_Active: new Date(),
+                    Is_Active: true,
+                });
+            } else {
+                // Create new device entry
+                await UserDevice.create({
+                    ID_User: userId,
+                    FCM_Token: fcm_token,
+                    Device_Name: device_name || 'Unknown Device',
+                    Last_Active: new Date(),
+                    Is_Active: true,
+                });
+            }
+
+            // Also update User's FCM_Token for backward compatibility (used by loan reminders)
             await User.update(
                 { FCM_Token: fcm_token },
                 { where: { ID_User: userId } }
             );
 
-            // Update all active reminders for this user with the new token
+            // Update all active reminders for this user to use the new token
             await ReminderSetting.update(
                 { fcm_token },
                 { where: { ID_User: userId, is_active: true } }
             );
 
-            console.log(`✓ FCM token registered for user ${userId}`);
+            console.log(`✓ FCM token registered for user ${userId} (device: ${device_name || 'Unknown'})`);
 
             res.status(200).json({
                 success: true,

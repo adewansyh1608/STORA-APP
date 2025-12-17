@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.stora" />
+                  <option name="mobileSdkAppId" value="1:808826013914:android:0b1ec04105f57a8302fde3" />
+                  <option name="projectId" value="stora-app-fc75c" />
+                  <option name="projectNumber" value="808826013914" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
