@@ -41,9 +41,9 @@ const statusValidationRules = [
 ];
 
 // Routes
-router.get('/', peminjamanController.getAllPeminjaman);
-router.get('/stats', peminjamanController.getPeminjamanStats);
-router.get('/:id', peminjamanController.getPeminjamanById);
+router.get('/', authMiddleware, peminjamanController.getAllPeminjaman);
+router.get('/stats', authMiddleware, peminjamanController.getPeminjamanStats);
+router.get('/:id', authMiddleware, peminjamanController.getPeminjamanById);
 // JSON-only route for peminjaman without photos
 router.post('/', authMiddleware, peminjamanValidationRules, peminjamanController.createPeminjaman);
 // Multipart route for peminjaman with photos

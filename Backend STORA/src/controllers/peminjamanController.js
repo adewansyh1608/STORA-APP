@@ -6,10 +6,23 @@ class PeminjamanController {
   // Get all peminjaman
   async getAllPeminjaman(req, res) {
     try {
+      console.log('===== GET ALL PEMINJAMAN REQUEST =====');
+      console.log('Query params:', req.query);
+      console.log('User from token:', req.user);
+
       const { page = 1, limit = 10, status = '', search = '' } = req.query;
       const offset = (page - 1) * limit;
 
       let whereClause = {};
+
+      // Filter by user ID - each user only sees their own loans
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+        console.log(`Filtering by user ID: ${req.user.id}`);
+      } else {
+        console.log('WARNING: No user ID found in request!');
+      }
+
       if (status) {
         whereClause.Status = status;
       }
@@ -58,6 +71,7 @@ class PeminjamanController {
         }
       });
     } catch (error) {
+      console.error('✗ Error getting peminjaman:', error.message);
       res.status(500).json({
         success: false,
         message: error.message
@@ -69,7 +83,19 @@ class PeminjamanController {
   async getPeminjamanById(req, res) {
     try {
       const { id } = req.params;
-      const peminjaman = await Peminjaman.findByPk(id, {
+
+      // Build where clause including user ownership check
+      const whereClause = {
+        ID_Peminjaman: id
+      };
+
+      // Only allow access to user's own loans
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+      }
+
+      const peminjaman = await Peminjaman.findOne({
+        where: whereClause,
         include: [
           {
             association: 'user',
@@ -98,7 +124,7 @@ class PeminjamanController {
       if (!peminjaman) {
         return res.status(404).json({
           success: false,
-          message: 'Peminjaman not found'
+          message: 'Peminjaman not found or you do not have permission to access it'
         });
       }
 
@@ -296,6 +322,16 @@ class PeminjamanController {
       const { id } = req.params;
       const { Status, Tanggal_Dikembalikan } = req.body;
 
+      // Build where clause including user ownership check
+      const whereClause = {
+        ID_Peminjaman: id
+      };
+
+      // Only allow update of user's own loans
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+      }
+
       const updateData = { Status };
       if (Tanggal_Dikembalikan) {
         updateData.Tanggal_Dikembalikan = Tanggal_Dikembalikan;
@@ -303,17 +339,17 @@ class PeminjamanController {
 
       const [updatedRowsCount] = await Peminjaman.update(
         updateData,
-        { where: { ID_Peminjaman: id } }
+        { where: whereClause }
       );
 
       if (updatedRowsCount === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Peminjaman not found'
+          message: 'Peminjaman not found or you do not have permission to update it'
         });
       }
 
-      const updatedPeminjaman = await Peminjaman.findByPk(id);
+      const updatedPeminjaman = await Peminjaman.findOne({ where: whereClause });
 
       res.status(200).json({
         success: true,
@@ -372,12 +408,22 @@ class PeminjamanController {
     try {
       const { id } = req.params;
 
-      const peminjaman = await Peminjaman.findByPk(id);
+      // Build where clause including user ownership check
+      const whereClause = {
+        ID_Peminjaman: id
+      };
+
+      // Only allow deletion of user's own loans
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+      }
+
+      const peminjaman = await Peminjaman.findOne({ where: whereClause });
       if (!peminjaman) {
         await transaction.rollback();
         return res.status(404).json({
           success: false,
-          message: 'Peminjaman not found'
+          message: 'Peminjaman not found or you do not have permission to delete it'
         });
       }
 
