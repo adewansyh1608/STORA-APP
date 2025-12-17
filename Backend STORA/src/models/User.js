@@ -47,6 +47,11 @@ const User = sequelize.define(
       allowNull: true,
       field: 'Foto_Profile',
     },
+    FCM_Token: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'FCM_Token',
+    },
   },
   {
     tableName: 'users',

@@ -45,6 +45,9 @@ fun AppNavHost(
     // Navigate after successful login
     LaunchedEffect(authState.isLoggedIn, authState.isSuccess) {
         if (authState.isLoggedIn && authState.isSuccess) {
+            // Refresh profile data from token manager
+            userProfileViewModel.loadProfileFromToken()
+            
             navController.navigate(Routes.HOME_SCREEN) {
                 popUpTo(Routes.AUTH_SCREEN) { inclusive = true }
             }

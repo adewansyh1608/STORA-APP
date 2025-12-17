@@ -92,6 +92,16 @@ ReminderSetting.belongsTo(User, {
   as: 'user',
 });
 
+// Peminjaman <-> Notifikasi (One-to-Many)
+Peminjaman.hasMany(Notifikasi, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'notifikasi',
+});
+Notifikasi.belongsTo(Peminjaman, {
+  foreignKey: 'ID_Peminjaman',
+  as: 'peminjaman',
+});
+
 // Export all models and sequelize instance
 module.exports = {
   sequelize,

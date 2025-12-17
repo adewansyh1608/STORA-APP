@@ -310,15 +310,8 @@ fun InventoryScreen(
                 color = dividerYellow
             )
 
-            // Loading indicator
-            if (isLoading && items.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = StoraYellow)
-                }
-            } else if (items.isEmpty()) {
+            // Empty state
+            if (items.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -327,14 +320,28 @@ fun InventoryScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Widgets,
+                            contentDescription = null,
+                            tint = StoraYellow.copy(alpha = 0.6f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Penyimpanan kosong.",
+                            text = "Data Inventaris Belum Tersedia",
                             color = StoraWhite,
-                            fontSize = 16.sp
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Tekan tombol + untuk menambah inventaris baru",
+                            color = Color.Gray,
+                            fontSize = 14.sp
                         )
                         if (!viewModel.isOnline()) {
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Offline - Tidak ada data lokal",
+                                text = "Mode Offline",
                                 color = Color.Gray,
                                 fontSize = 12.sp
                             )

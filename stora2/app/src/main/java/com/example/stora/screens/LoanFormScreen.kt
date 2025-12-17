@@ -73,9 +73,13 @@ fun LoanFormScreen(
     var borrowerName by remember { mutableStateOf("") }
     var borrowerPhone by remember { mutableStateOf("") }
     var borrowDate by remember { mutableStateOf("") }
+    var borrowTime by remember { mutableStateOf("") }
     var returnDate by remember { mutableStateOf("") }
+    var returnTime by remember { mutableStateOf("") }
     var showBorrowDatePicker by remember { mutableStateOf(false) }
+    var showBorrowTimePicker by remember { mutableStateOf(false) }
     var showReturnDatePicker by remember { mutableStateOf(false) }
+    var showReturnTimePicker by remember { mutableStateOf(false) }
     var selectedItemForPhoto by remember { mutableStateOf<Int?>(null) }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -280,80 +284,134 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Date Pickers Row
+                    // Borrow Date and Time Section
+                    Text(
+                        text = "Tanggal & Jam Peminjaman",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Borrow Date
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Tanggal Peminjaman",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = textGray,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = borrowDate,
-                                onValueChange = {},
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
-                                placeholder = { Text("Pilih tanggal", fontSize = 12.sp) },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Filled.CalendarToday,
-                                        contentDescription = "Calendar",
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable { showBorrowDatePicker = true }
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = StoraWhite,
-                                    unfocusedContainerColor = StoraWhite,
-                                    focusedIndicatorColor = StoraBlueDark,
-                                    unfocusedIndicatorColor = Color(0xFFE0E0E0)
+                        OutlinedTextField(
+                            value = borrowDate,
+                            onValueChange = {},
+                            modifier = Modifier.weight(1f),
+                            readOnly = true,
+                            placeholder = { Text("Pilih tanggal", fontSize = 12.sp) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Filled.CalendarToday,
+                                    contentDescription = "Calendar",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { showBorrowDatePicker = true }
                                 )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = StoraWhite,
+                                unfocusedContainerColor = StoraWhite,
+                                focusedIndicatorColor = StoraBlueDark,
+                                unfocusedIndicatorColor = Color(0xFFE0E0E0)
                             )
-                        }
+                        )
+                        
+                        // Borrow Time
+                        OutlinedTextField(
+                            value = borrowTime,
+                            onValueChange = {},
+                            modifier = Modifier.weight(0.7f),
+                            readOnly = true,
+                            placeholder = { Text("Jam", fontSize = 12.sp) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Filled.AccessTime,
+                                    contentDescription = "Time",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { showBorrowTimePicker = true }
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = StoraWhite,
+                                unfocusedContainerColor = StoraWhite,
+                                focusedIndicatorColor = StoraBlueDark,
+                                unfocusedIndicatorColor = Color(0xFFE0E0E0)
+                            )
+                        )
+                    }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Return Date and Time Section (Deadline)
+                    Text(
+                        text = "Tanggal & Jam Deadline Pengembalian",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         // Return Date
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Tanggal Pengembalian",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = textGray,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = returnDate,
-                                onValueChange = {},
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
-                                placeholder = { Text("Pilih tanggal", fontSize = 12.sp) },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Filled.CalendarToday,
-                                        contentDescription = "Calendar",
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable { showReturnDatePicker = true }
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = StoraWhite,
-                                    unfocusedContainerColor = StoraWhite,
-                                    focusedIndicatorColor = StoraBlueDark,
-                                    unfocusedIndicatorColor = Color(0xFFE0E0E0)
+                        OutlinedTextField(
+                            value = returnDate,
+                            onValueChange = {},
+                            modifier = Modifier.weight(1f),
+                            readOnly = true,
+                            placeholder = { Text("Pilih tanggal", fontSize = 12.sp) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Filled.CalendarToday,
+                                    contentDescription = "Calendar",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { showReturnDatePicker = true }
                                 )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = StoraWhite,
+                                unfocusedContainerColor = StoraWhite,
+                                focusedIndicatorColor = StoraBlueDark,
+                                unfocusedIndicatorColor = Color(0xFFE0E0E0)
                             )
-                        }
+                        )
+                        
+                        // Return Time
+                        OutlinedTextField(
+                            value = returnTime,
+                            onValueChange = {},
+                            modifier = Modifier.weight(0.7f),
+                            readOnly = true,
+                            placeholder = { Text("Jam", fontSize = 12.sp) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Filled.AccessTime,
+                                    contentDescription = "Time",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { showReturnTimePicker = true }
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = StoraWhite,
+                                unfocusedContainerColor = StoraWhite,
+                                focusedIndicatorColor = StoraBlueDark,
+                                unfocusedIndicatorColor = Color(0xFFE0E0E0)
+                            )
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -489,6 +547,10 @@ fun LoanFormScreen(
                     // Save Button
                     Button(
                         onClick = {
+                            // Combine date and time
+                            val fullBorrowDateTime = "$borrowDate $borrowTime"
+                            val fullReturnDateTime = "$returnDate $returnTime"
+                            
                             // Prepare LoanItemInfo list for Room storage with individual images
                             val loanItemInfos = loanItems.map { loanFormItem ->
                                 LoanItemInfo(
@@ -504,8 +566,8 @@ fun LoanFormScreen(
                             loanViewModel.createLoan(
                                 namaPeminjam = borrowerName,
                                 noHpPeminjam = borrowerPhone,
-                                tanggalPinjam = borrowDate,
-                                tanggalKembali = returnDate,
+                                tanggalPinjam = fullBorrowDateTime,
+                                tanggalKembali = fullReturnDateTime,
                                 items = loanItemInfos,
                                 onSuccess = {
                                     // ViewModel already syncs Room data to LoansData automatically
@@ -530,7 +592,7 @@ fun LoanFormScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = StoraYellowButton
                         ),
-                        enabled = borrowerName.isNotBlank() && borrowDate.isNotBlank() && returnDate.isNotBlank() && !isLoading
+                        enabled = borrowerName.isNotBlank() && borrowDate.isNotBlank() && borrowTime.isNotBlank() && returnDate.isNotBlank() && returnTime.isNotBlank() && !isLoading
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -539,7 +601,7 @@ fun LoanFormScreen(
                             )
                         } else {
                             Text(
-                                text = "Save",
+                                text = "Simpan",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = StoraBlueDark
@@ -624,6 +686,75 @@ fun LoanFormScreen(
                 showModeToggle = false
             )
         }
+    }
+
+    // Time Pickers
+    if (showBorrowTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY),
+            initialMinute = java.util.Calendar.getInstance().get(java.util.Calendar.MINUTE),
+            is24Hour = true
+        )
+        
+        AlertDialog(
+            onDismissRequest = { showBorrowTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    borrowTime = String.format("%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    showBorrowTimePicker = false
+                }) {
+                    Text("OK", color = StoraBlueDark)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBorrowTimePicker = false }) {
+                    Text("Batal", color = Color.Gray)
+                }
+            },
+            title = { Text("Pilih Jam Peminjaman") },
+            text = {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timePickerState)
+                }
+            }
+        )
+    }
+
+    if (showReturnTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY),
+            initialMinute = java.util.Calendar.getInstance().get(java.util.Calendar.MINUTE),
+            is24Hour = true
+        )
+        
+        AlertDialog(
+            onDismissRequest = { showReturnTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    returnTime = String.format("%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    showReturnTimePicker = false
+                }) {
+                    Text("OK", color = StoraBlueDark)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReturnTimePicker = false }) {
+                    Text("Batal", color = Color.Gray)
+                }
+            },
+            title = { Text("Pilih Jam Deadline Pengembalian") },
+            text = {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timePickerState)
+                }
+            }
+        )
     }
 }
 

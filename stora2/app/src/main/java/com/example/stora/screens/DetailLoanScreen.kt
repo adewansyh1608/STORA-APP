@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Widgets
@@ -59,10 +61,19 @@ fun DetailLoanScreen(
     val isLoading by loanViewModel.isLoading.collectAsState()
     
     // Map untuk menyimpan return image per item
-    val returnImageUris = remember { mutableMapOf<Int, Uri?>() }
+    val returnImageUris = remember { mutableStateMapOf<Int, Uri?>() }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var selectedItemForReturn by remember { mutableStateOf<Int?>(null) }
     var showImagePickerDialog by remember { mutableStateOf(false) }
+    
+    // Return date and time states
+    val calendar = remember { java.util.Calendar.getInstance() }
+    val sdf = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
+    val timeSdf = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
+    var returnDate by remember { mutableStateOf(sdf.format(calendar.time)) }
+    var returnTime by remember { mutableStateOf(timeSdf.format(calendar.time)) }
+    var showReturnDatePicker by remember { mutableStateOf(false) }
+    var showReturnTimePicker by remember { mutableStateOf(false) }
     
     val loan = remember(loanId) {
         LoansData.loansOnLoan.find { it.id == loanId }
@@ -428,9 +439,79 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(32.dp))
                         
+                        // Return Date and Time Section
+                        Text(
+                            text = "Tanggal & Jam Pengembalian",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = StoraBlueDark
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Return Date
+                            OutlinedTextField(
+                                value = returnDate,
+                                onValueChange = {},
+                                modifier = Modifier.weight(1f),
+                                readOnly = true,
+                                label = { Text("Tanggal", fontSize = 12.sp) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.CalendarToday,
+                                        contentDescription = "Calendar",
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable { showReturnDatePicker = true }
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFFF9F9F9),
+                                    unfocusedContainerColor = Color(0xFFF9F9F9),
+                                    focusedBorderColor = StoraBlueDark,
+                                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                                )
+                            )
+                            
+                            // Return Time
+                            OutlinedTextField(
+                                value = returnTime,
+                                onValueChange = {},
+                                modifier = Modifier.weight(0.7f),
+                                readOnly = true,
+                                label = { Text("Jam", fontSize = 12.sp) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.AccessTime,
+                                        contentDescription = "Time",
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable { showReturnTimePicker = true }
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFFF9F9F9),
+                                    unfocusedContainerColor = Color(0xFFF9F9F9),
+                                    focusedBorderColor = StoraBlueDark,
+                                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                                )
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
                         // Return Button
                         Button(
                             onClick = {
+                                // Combine return date and time
+                                val fullReturnDateTime = "$returnDate $returnTime"
+                                
                                 // Get the Room loan ID from the first item
                                 val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
                                 
@@ -445,6 +526,7 @@ fun DetailLoanScreen(
                                     // Call ViewModel to update Room and sync
                                     loanViewModel.returnLoan(
                                         loanId = roomLoanId,
+                                        returnDateTime = fullReturnDateTime,
                                         itemReturnImages = itemReturnImages,
                                         onSuccess = {
                                             // Navigate back to LoansScreen
@@ -488,7 +570,7 @@ fun DetailLoanScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "Return",
+                                    text = "Kembalikan Barang",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = StoraBlueDark
@@ -513,6 +595,70 @@ fun DetailLoanScreen(
                 onCameraClick = {
                     showImagePickerDialog = false
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+            )
+        }
+        
+        // Return Date Picker
+        if (showReturnDatePicker) {
+            val datePickerState = rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { showReturnDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            returnDate = sdf.format(java.util.Date(millis))
+                        }
+                        showReturnDatePicker = false
+                    }) {
+                        Text("OK", color = StoraBlueDark)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showReturnDatePicker = false }) {
+                        Text("Batal", color = Color.Gray)
+                    }
+                }
+            ) {
+                DatePicker(
+                    state = datePickerState,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    showModeToggle = false
+                )
+            }
+        }
+        
+        // Return Time Picker
+        if (showReturnTimePicker) {
+            val timePickerState = rememberTimePickerState(
+                initialHour = calendar.get(java.util.Calendar.HOUR_OF_DAY),
+                initialMinute = calendar.get(java.util.Calendar.MINUTE),
+                is24Hour = true
+            )
+            
+            AlertDialog(
+                onDismissRequest = { showReturnTimePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        returnTime = String.format("%02d:%02d", timePickerState.hour, timePickerState.minute)
+                        showReturnTimePicker = false
+                    }) {
+                        Text("OK", color = StoraBlueDark)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showReturnTimePicker = false }) {
+                        Text("Batal", color = Color.Gray)
+                    }
+                },
+                title = { Text("Pilih Jam Pengembalian") },
+                text = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TimePicker(state = timePickerState)
+                    }
                 }
             )
         }

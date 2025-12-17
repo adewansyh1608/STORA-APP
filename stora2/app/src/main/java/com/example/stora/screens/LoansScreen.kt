@@ -125,9 +125,9 @@ fun LoansScreen(
     // Filter items berdasarkan tab yang dipilih
     val currentItems = if (selectedTab == 0) LoansData.loansOnLoan else LoansData.loansHistory
 
-    val filteredItems = remember(searchQuery, currentItems) {
+    val filteredItems = remember(searchQuery, currentItems, currentItems.size) {
         if (searchQuery.isBlank()) {
-            currentItems
+            currentItems.toList()
         } else {
             currentItems.filter { item ->
                 item.borrower?.contains(searchQuery, ignoreCase = true) == true ||

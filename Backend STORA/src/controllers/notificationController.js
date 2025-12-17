@@ -16,6 +16,12 @@ class NotificationController {
                 });
             }
 
+            // Save FCM token to User model for loan deadline notifications
+            await User.update(
+                { FCM_Token: fcm_token },
+                { where: { ID_User: userId } }
+            );
+
             // Update all active reminders for this user with the new token
             await ReminderSetting.update(
                 { fcm_token },

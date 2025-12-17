@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.stora.data.InventoryItem
+import com.example.stora.data.LoansData
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellow
@@ -341,7 +342,55 @@ fun DetailContent(item: InventoryItem) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
-                DetailInfoRow(label = "Jumlah", value = item.quantity.toString())
+                // Quantity Breakdown Section
+                Text(
+                    text = "Stok Barang",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StoraBlueDark,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                // Calculate quantities
+                val totalQuantity = item.quantity
+                val borrowedQuantity = LoansData.getBorrowedQuantity(item)
+                val availableQuantity = totalQuantity - borrowedQuantity
+                
+                // Quantity Cards Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Total Quantity Card
+                    QuantityCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Total",
+                        value = totalQuantity,
+                        backgroundColor = Color(0xFFF5F5F5),
+                        valueColor = StoraBlueDark
+                    )
+                    
+                    // Borrowed Quantity Card
+                    QuantityCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Dipinjam",
+                        value = borrowedQuantity,
+                        backgroundColor = Color(0xFFFFF3E0),
+                        valueColor = Color(0xFFE65100)
+                    )
+                    
+                    // Available Quantity Card
+                    QuantityCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Tersedia",
+                        value = availableQuantity,
+                        backgroundColor = Color(0xFFE8F5E9),
+                        valueColor = Color(0xFF2E7D32)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 DetailInfoRow(label = "Kategori", value = item.category)
                 DetailInfoRow(label = "Kondisi", value = item.condition)
                 DetailInfoRow(label = "Lokasi", value = item.location)
@@ -426,5 +475,40 @@ fun DetailInfoRow(label: String, value: String) {
             fontWeight = FontWeight.Normal,
             modifier = Modifier.padding(start = 8.dp)
         )
+    }
+}
+
+@Composable
+fun QuantityCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: Int,
+    backgroundColor: Color,
+    valueColor: Color
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .padding(vertical = 16.dp, horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value.toString(),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = valueColor
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Gray
+            )
+        }
     }
 }

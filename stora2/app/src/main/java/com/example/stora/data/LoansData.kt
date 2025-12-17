@@ -105,6 +105,24 @@ object LoansData {
     }
 
     /**
+     * Get borrowed quantity for a specific inventory item
+     */
+    fun getBorrowedQuantity(item: InventoryItem): Int {
+        return loansOnLoan
+            .filter { it.code == item.noinv }
+            .sumOf { it.quantity }
+    }
+
+    /**
+     * Get borrowed quantity by item code
+     */
+    fun getBorrowedQuantityByCode(itemCode: String): Int {
+        return loansOnLoan
+            .filter { it.code == itemCode }
+            .sumOf { it.quantity }
+    }
+
+    /**
      * Get available quantity for an inventory item
      * (total quantity - currently on loan)
      */

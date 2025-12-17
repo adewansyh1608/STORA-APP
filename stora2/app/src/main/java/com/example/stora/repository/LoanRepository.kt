@@ -158,39 +158,54 @@ class LoanRepository(
         }
     }
 
-    suspend fun returnLoan(loanId: String, itemReturnImages: Map<String, String?>): Result<Unit> {
+    suspend fun returnLoan(loanId: String, returnDateTime: String, itemReturnImages: Map<String, String?>): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
                 val loan = loanDao.getLoanById(loanId)
                     ?: return@withContext Result.failure(Exception("Loan not found"))
 
-                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-                val currentDate = sdf.format(java.util.Date())
+                // Use the provided return date/time
+                val returnDate = returnDateTime
+                
+                // Parse date for comparison (support both "dd/MM/yyyy" and "dd/MM/yyyy HH:mm" formats)
+                val dateOnlyFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                val dateTimeFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                 
                 // Determine if late based on due date
                 // Selesai = returned on or before deadline
                 // Terlambat = returned after deadline
                 val status = try {
-                    val today = java.util.Calendar.getInstance()
-                    today.set(java.util.Calendar.HOUR_OF_DAY, 0)
-                    today.set(java.util.Calendar.MINUTE, 0)
-                    today.set(java.util.Calendar.SECOND, 0)
-                    today.set(java.util.Calendar.MILLISECOND, 0)
-                    
-                    val dueDate = java.util.Calendar.getInstance()
-                    val dueDateParsed = sdf.parse(loan.tanggalKembali)
-                    if (dueDateParsed != null) {
-                        dueDate.time = dueDateParsed
-                        dueDate.set(java.util.Calendar.HOUR_OF_DAY, 23)
-                        dueDate.set(java.util.Calendar.MINUTE, 59)
-                        dueDate.set(java.util.Calendar.SECOND, 59)
+                    val returnCal = java.util.Calendar.getInstance()
+                    val returnParsed = try {
+                        dateTimeFormat.parse(returnDateTime)
+                    } catch (e: Exception) {
+                        dateOnlyFormat.parse(returnDateTime)
+                    }
+                    if (returnParsed != null) {
+                        returnCal.time = returnParsed
                     }
                     
-                    if (dueDateParsed != null && today.after(dueDate)) {
-                        Log.d(TAG, "Return is LATE: today=${sdf.format(today.time)}, deadline=${loan.tanggalKembali}")
+                    val dueDate = java.util.Calendar.getInstance()
+                    val dueDateParsed = try {
+                        dateTimeFormat.parse(loan.tanggalKembali)
+                    } catch (e: Exception) {
+                        dateOnlyFormat.parse(loan.tanggalKembali)
+                    }
+                    if (dueDateParsed != null) {
+                        dueDate.time = dueDateParsed
+                        // If due date has no time component, set it to end of day
+                        if (!loan.tanggalKembali.contains(":")) {
+                            dueDate.set(java.util.Calendar.HOUR_OF_DAY, 23)
+                            dueDate.set(java.util.Calendar.MINUTE, 59)
+                            dueDate.set(java.util.Calendar.SECOND, 59)
+                        }
+                    }
+                    
+                    if (dueDateParsed != null && returnCal.after(dueDate)) {
+                        Log.d(TAG, "Return is LATE: return=$returnDateTime, deadline=${loan.tanggalKembali}")
                         "Terlambat"
                     } else {
-                        Log.d(TAG, "Return is ON TIME: today=${sdf.format(today.time)}, deadline=${loan.tanggalKembali}")
+                        Log.d(TAG, "Return is ON TIME: return=$returnDateTime, deadline=${loan.tanggalKembali}")
                         "Selesai"
                     }
                 } catch (e: Exception) {
@@ -202,7 +217,7 @@ class LoanRepository(
                 loanDao.updateLoanStatus(
                     loanId = loanId,
                     status = status,
-                    returnDate = currentDate,
+                    returnDate = returnDate,
                     lastModified = System.currentTimeMillis()
                 )
 
@@ -221,10 +236,21 @@ class LoanRepository(
                     try {
                         val authHeader = getAuthToken()
                         if (authHeader != null) {
-                            // Convert date format for API (dd/MM/yyyy to yyyy-MM-dd)
+                            // Convert date format for API (dd/MM/yyyy HH:mm to yyyy-MM-dd HH:mm:ss)
+                            val apiDateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
                             val apiDateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-                            val parsedDate = sdf.parse(currentDate)
-                            val apiFormattedDate = parsedDate?.let { apiDateFormat.format(it) } ?: currentDate
+                            val parsedDate = try {
+                                dateTimeFormat.parse(returnDate)
+                            } catch (e: Exception) {
+                                dateOnlyFormat.parse(returnDate)
+                            }
+                            val apiFormattedDate = parsedDate?.let { 
+                                if (returnDate.contains(":")) {
+                                    apiDateTimeFormat.format(it)
+                                } else {
+                                    apiDateFormat.format(it)
+                                }
+                            } ?: returnDate
                             
                             // Update peminjaman status
                             val response = apiService.updatePeminjamanStatus(
@@ -305,15 +331,21 @@ class LoanRepository(
                                 token = authHeader,
                                 id = sid
                             )
-                            if (response.isSuccessful) {
-                                Log.d(TAG, "Loan deleted from server: $sid")
+                            if (!response.isSuccessful) {
+                                if (response.code() == 404) {
+                                    Log.d(TAG, "Loan already deleted from server (404)")
+                                } else {
+                                    val errorMsg = response.errorBody()?.string() ?: response.message()
+                                    Log.e(TAG, "Failed to delete from server: $errorMsg")
+                                    throw Exception("Gagal menghapus dari server: $errorMsg")
+                                }
                             } else {
-                                Log.e(TAG, "Failed to delete from server: ${response.errorBody()?.string()}")
+                                Log.d(TAG, "Loan deleted from server: $sid")
                             }
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error deleting from server", e)
-                        // Continue to delete locally even if server delete fails
+                        throw e
                     }
                 }
                 
@@ -466,15 +498,31 @@ class LoanRepository(
                 // Use multipart endpoint with photos
                 Log.d(TAG, "Syncing loan with ${itemsWithPhotos.size} photos")
                 
-                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                val dateOnlyFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                val dateTimeFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                 val apiDateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val apiDateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
                 
                 val tanggalPinjamApi = try {
-                    sdf.parse(loan.tanggalPinjam)?.let { apiDateFormat.format(it) } ?: loan.tanggalPinjam
+                    val parsed = if (loan.tanggalPinjam.contains(":")) {
+                        dateTimeFormat.parse(loan.tanggalPinjam)
+                    } else {
+                        dateOnlyFormat.parse(loan.tanggalPinjam)
+                    }
+                    parsed?.let { 
+                        if (loan.tanggalPinjam.contains(":")) apiDateTimeFormat.format(it) else apiDateFormat.format(it)
+                    } ?: loan.tanggalPinjam
                 } catch (e: Exception) { loan.tanggalPinjam }
                 
                 val tanggalKembaliApi = try {
-                    sdf.parse(loan.tanggalKembali)?.let { apiDateFormat.format(it) } ?: loan.tanggalKembali
+                    val parsed = if (loan.tanggalKembali.contains(":")) {
+                        dateTimeFormat.parse(loan.tanggalKembali)
+                    } else {
+                        dateOnlyFormat.parse(loan.tanggalKembali)
+                    }
+                    parsed?.let { 
+                        if (loan.tanggalKembali.contains(":")) apiDateTimeFormat.format(it) else apiDateFormat.format(it)
+                    } ?: loan.tanggalKembali
                 } catch (e: Exception) { loan.tanggalKembali }
                 
                 // Build barangList JSON

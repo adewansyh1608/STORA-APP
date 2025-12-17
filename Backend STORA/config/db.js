@@ -11,6 +11,17 @@ const sequelize = new Sequelize(dbname, username, password, {
   host: host,
   dialect: dialect,
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  timezone: '+07:00', // Asia/Jakarta timezone
+  dialectOptions: {
+    dateStrings: true,
+    typeCast: function (field, next) {
+      // For DATETIME and DATE fields, return as-is (string) to avoid timezone conversion
+      if (field.type === 'DATETIME' || field.type === 'DATE') {
+        return field.string();
+      }
+      return next();
+    }
+  },
   pool: {
     max: 10,
     min: 0,

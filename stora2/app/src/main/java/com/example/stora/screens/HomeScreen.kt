@@ -432,6 +432,15 @@ private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit, count: Int 
  */
 @Composable
 private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
+    // Determine if this is a loan deadline notification
+    val isLoanNotification = notification.judul?.contains("Deadline") == true || 
+                              notification.judul?.contains("Pengembalian") == true ||
+                              notification.pesan?.contains("pengembalian") == true ||
+                              notification.pesan?.contains("peminjaman") == true
+    
+    val iconColor = if (isLoanNotification) Color(0xFFE65100) else StoraBlueDark
+    val bgColor = if (isLoanNotification) Color(0xFFFFF3E0) else StoraBlueDark.copy(alpha = 0.1f)
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -451,13 +460,13 @@ private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(StoraBlueDark.copy(alpha = 0.1f)),
+                    .background(bgColor),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Inventory2,
+                    imageVector = if (isLoanNotification) Icons.AutoMirrored.Outlined.ReceiptLong else Icons.Outlined.Inventory2,
                     contentDescription = "Notification",
-                    tint = StoraBlueDark,
+                    tint = iconColor,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -467,7 +476,7 @@ private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
                     text = notification.judul ?: "Notifikasi",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = StoraBlueDark
+                    color = if (isLoanNotification) Color(0xFFE65100) else StoraBlueDark
                 )
                 Text(
                     text = notification.pesan ?: "",

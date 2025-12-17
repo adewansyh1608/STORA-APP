@@ -1,4 +1,4 @@
-const { Inventaris, FotoInventaris, User, sequelize } = require('../models');
+const { Inventaris, FotoInventaris, User, PeminjamanBarang, Peminjaman, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
@@ -303,6 +303,67 @@ class InventarisController {
       res.status(500).json({
         success: false,
         message: error.message,
+      });
+    }
+  }
+
+  // Get borrowed quantity for a specific inventory item
+  async getBorrowedQuantity(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Check if inventory exists and belongs to user
+      const whereClause = {
+        ID_Inventaris: id
+      };
+
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+      }
+
+      const inventaris = await Inventaris.findOne({
+        where: whereClause
+      });
+
+      if (!inventaris) {
+        return res.status(404).json({
+          success: false,
+          message: 'Inventaris not found'
+        });
+      }
+
+      // Get total borrowed quantity from active loans (status = 'Dipinjam')
+      const borrowedQuantity = await PeminjamanBarang.sum('Jumlah', {
+        where: {
+          ID_Inventaris: id
+        },
+        include: [{
+          model: Peminjaman,
+          as: 'peminjaman',
+          where: {
+            Status: 'Dipinjam'
+          },
+          attributes: []
+        }]
+      });
+
+      const totalQuantity = inventaris.Jumlah;
+      const borrowed = borrowedQuantity || 0;
+      const available = totalQuantity - borrowed;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          totalQuantity,
+          borrowedQuantity: borrowed,
+          availableQuantity: available
+        }
+      });
+    } catch (error) {
+      console.error('Error getting borrowed quantity:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
       });
     }
   }

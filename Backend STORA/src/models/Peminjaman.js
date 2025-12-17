@@ -21,17 +21,17 @@ const Peminjaman = sequelize.define(
       field: 'NoHP_Peminjam',
     },
     Tanggal_Pinjam: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: true,
       field: 'Tanggal_Pinjam',
     },
     Tanggal_Kembali: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: true,
       field: 'Tanggal_Kembali',
     },
     Tanggal_Dikembalikan: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: true,
       field: 'Tanggal_Dikembalikan',
     },

@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { ReminderSetting, User, Notifikasi } = require('../models');
+const { ReminderSetting, User, Notifikasi, Peminjaman } = require('../models');
 const { sendPushNotification } = require('./firebaseAdmin');
 const { Op } = require('sequelize');
 
@@ -40,6 +40,9 @@ class ReminderScheduler {
 
             // Check custom scheduled reminders
             await this.checkCustomReminders(now);
+
+            // Check loan return deadlines
+            await this.checkLoanDeadlines(now);
         } catch (error) {
             console.error('Error in reminder scheduler:', error);
         }
@@ -148,6 +151,189 @@ class ReminderScheduler {
             (date2.getFullYear() - date1.getFullYear()) * 12 +
             (date2.getMonth() - date1.getMonth());
         return months;
+    }
+
+    // Check loan return deadlines and send notifications
+    async checkLoanDeadlines(now) {
+        try {
+            // Get all active loans (status = 'Dipinjam')
+            const activeLoans = await Peminjaman.findAll({
+                where: {
+                    Status: 'Dipinjam',
+                    Tanggal_Kembali: { [Op.ne]: null }
+                },
+                include: [{
+                    model: User,
+                    as: 'user',
+                    attributes: ['ID_User', 'Nama_User', 'FCM_Token']
+                }]
+            });
+
+            console.log(`📋 Found ${activeLoans.length} active loans to check for deadlines`);
+
+            const today = new Date(now);
+            today.setHours(0, 0, 0, 0);
+
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+
+            console.log(`⏰ Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
+
+            for (const loan of activeLoans) {
+                const hasFcmToken = loan.user && loan.user.FCM_Token;
+                console.log(`  Loan ${loan.ID_Peminjaman}: ${loan.Nama_Peminjam}, deadline: ${loan.Tanggal_Kembali}, FCM: ${hasFcmToken ? 'YES' : 'NO'}`);
+
+                if (!hasFcmToken) {
+                    console.log(`  ⚠ Skipping loan ${loan.ID_Peminjaman} - no FCM token`);
+                    continue;
+                }
+
+                const deadlineDate = new Date(loan.Tanggal_Kembali);
+                const deadlineDateOnly = new Date(deadlineDate);
+                deadlineDateOnly.setHours(0, 0, 0, 0);
+
+                const deadlineHour = deadlineDate.getHours();
+                const deadlineMinute = deadlineDate.getMinutes();
+
+                // Check if today is the deadline day
+                const isDeadlineDay = today.getTime() === deadlineDateOnly.getTime();
+                console.log(`  📅 Deadline: ${deadlineHour}:${deadlineMinute.toString().padStart(2, '0')}, isDeadlineDay: ${isDeadlineDay}`);
+
+                if (isDeadlineDay) {
+                    // Check for 07:00 AM morning reminder (trigger at 07:00)
+                    if (currentHour === 7 && currentMinute === 0) {
+                        await this.sendMorningReminder(loan, now);
+                    }
+
+                    // Check for exact deadline time reminder (or if past deadline time)
+                    const currentTotalMinutes = currentHour * 60 + currentMinute;
+                    const deadlineTotalMinutes = deadlineHour * 60 + deadlineMinute;
+
+                    // Send if we're at or past the deadline time
+                    if (currentTotalMinutes >= deadlineTotalMinutes) {
+                        await this.sendDeadlineReminder(loan, now);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error checking loan deadlines:', error);
+        }
+    }
+
+    async sendMorningReminder(loan, now) {
+        try {
+            // Check if we already sent the morning reminder today
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+
+            const existingMorningNotif = await Notifikasi.findOne({
+                where: {
+                    ID_User: loan.ID_User,
+                    ID_Peminjaman: loan.ID_Peminjaman,
+                    Judul: 'Deadline Pengembalian',
+                    Pesan: { [Op.like]: 'Hari ini adalah pengembalian peminjaman%' },
+                    Tanggal: { [Op.gte]: todayStart }
+                }
+            });
+
+            if (existingMorningNotif) {
+                console.log(`  ℹ Morning reminder already sent for loan ${loan.ID_Peminjaman}`);
+                return;
+            }
+
+            // Send morning reminder
+            const morningMessage = `Hari ini adalah pengembalian peminjaman atas nama "${loan.Nama_Peminjam}"`;
+
+            console.log(`  📤 Sending morning reminder for loan ${loan.ID_Peminjaman}...`);
+
+            const result = await sendPushNotification(
+                loan.user.FCM_Token,
+                'Deadline Pengembalian',
+                morningMessage,
+                {
+                    type: 'loan_deadline_reminder',
+                    loan_id: loan.ID_Peminjaman.toString(),
+                    borrower_name: loan.Nama_Peminjam
+                }
+            );
+
+            // Save notification to database regardless of FCM result
+            await Notifikasi.create({
+                Judul: 'Deadline Pengembalian',
+                Pesan: morningMessage,
+                Tanggal: now,
+                Status: result.success ? 'Terkirim' : 'Gagal',
+                ID_User: loan.ID_User,
+                ID_Peminjaman: loan.ID_Peminjaman,
+                isSynced: true
+            });
+
+            if (result.success) {
+                console.log(`  ✓ Morning deadline reminder sent for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
+            } else {
+                console.log(`  ⚠ Morning reminder saved to DB but FCM failed for loan ${loan.ID_Peminjaman}`);
+            }
+        } catch (error) {
+            console.error(`  ❌ Error sending morning reminder for loan ${loan.ID_Peminjaman}:`, error);
+        }
+    }
+
+    async sendDeadlineReminder(loan, now) {
+        try {
+            // Check if we already sent the deadline reminder today
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+
+            const existingDeadlineNotif = await Notifikasi.findOne({
+                where: {
+                    ID_User: loan.ID_User,
+                    ID_Peminjaman: loan.ID_Peminjaman,
+                    Judul: 'Deadline Pengembalian',
+                    Pesan: { [Op.like]: '%sudah melewati batas peminjaman%' },
+                    Tanggal: { [Op.gte]: todayStart }
+                }
+            });
+
+            if (existingDeadlineNotif) {
+                console.log(`  ℹ Deadline reminder already sent for loan ${loan.ID_Peminjaman}`);
+                return;
+            }
+
+            // Send overdue notification
+            const overdueMessage = `Peminjaman atas nama "${loan.Nama_Peminjam}" sudah melewati batas peminjaman`;
+
+            console.log(`  📤 Sending deadline reminder for loan ${loan.ID_Peminjaman}...`);
+
+            const result = await sendPushNotification(
+                loan.user.FCM_Token,
+                'Deadline Pengembalian',
+                overdueMessage,
+                {
+                    type: 'loan_overdue',
+                    loan_id: loan.ID_Peminjaman.toString(),
+                    borrower_name: loan.Nama_Peminjam
+                }
+            );
+
+            // Save notification to database regardless of FCM result
+            await Notifikasi.create({
+                Judul: 'Deadline Pengembalian',
+                Pesan: overdueMessage,
+                Tanggal: now,
+                Status: result.success ? 'Terkirim' : 'Gagal',
+                ID_User: loan.ID_User,
+                ID_Peminjaman: loan.ID_Peminjaman,
+                isSynced: true
+            });
+
+            if (result.success) {
+                console.log(`  ✓ Deadline reminder sent for loan ${loan.ID_Peminjaman} (${loan.Nama_Peminjam})`);
+            } else {
+                console.log(`  ⚠ Deadline reminder saved to DB but FCM failed for loan ${loan.ID_Peminjaman}`);
+            }
+        } catch (error) {
+            console.error(`  ❌ Error sending deadline reminder for loan ${loan.ID_Peminjaman}:`, error);
+        }
     }
 }
 

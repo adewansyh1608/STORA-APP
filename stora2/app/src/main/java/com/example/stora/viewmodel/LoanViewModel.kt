@@ -232,6 +232,7 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
 
     fun returnLoan(
         loanId: String,
+        returnDateTime: String,
         itemReturnImages: Map<String, String?>,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
@@ -241,6 +242,7 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val result = loanRepository.returnLoan(
                     loanId = loanId,
+                    returnDateTime = returnDateTime,
                     itemReturnImages = itemReturnImages
                 )
                 result.fold(

@@ -4,7 +4,12 @@
     "password": null,
     "database": "stora_db",
     "host": "127.0.0.1",
-    "dialect": "mysql"
+    "dialect": "mysql",
+    "timezone": "+07:00",
+    "dialectOptions": {
+      "dateStrings": true,
+      "typeCast": true
+    }
   },
   "test": {
     "username": "root",

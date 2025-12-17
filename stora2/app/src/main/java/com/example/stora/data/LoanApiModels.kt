@@ -207,14 +207,23 @@ fun LoanEntity.toApiRequest(items: List<LoanItemEntity>): LoanCreateRequest {
 }
 
 /**
- * Convert date from dd/MM/yyyy to yyyy-MM-dd (ISO format for API)
+ * Convert date from dd/MM/yyyy or dd/MM/yyyy HH:mm to yyyy-MM-dd or yyyy-MM-dd HH:mm:ss (ISO format for API)
  */
 private fun convertDateFormat(date: String): String {
     return try {
-        val inputFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-        val outputFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-        val parsedDate = inputFormat.parse(date)
-        parsedDate?.let { outputFormat.format(it) } ?: date
+        if (date.contains(":")) {
+            // DateTime format: dd/MM/yyyy HH:mm -> yyyy-MM-dd HH:mm:ss
+            val inputFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+            val outputFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+            val parsedDate = inputFormat.parse(date)
+            parsedDate?.let { outputFormat.format(it) } ?: date
+        } else {
+            // Date only format: dd/MM/yyyy -> yyyy-MM-dd
+            val inputFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            val outputFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            val parsedDate = inputFormat.parse(date)
+            parsedDate?.let { outputFormat.format(it) } ?: date
+        }
     } catch (e: Exception) {
         date // Return original if parsing fails
     }

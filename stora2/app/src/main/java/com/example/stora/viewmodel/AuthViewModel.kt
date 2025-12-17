@@ -1,16 +1,21 @@
 package com.example.stora.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stora.data.AppDatabase
 import com.example.stora.data.AuthResponse
+import com.example.stora.data.FcmTokenRequest
+import com.example.stora.network.ApiConfig
 import com.example.stora.repository.AuthRepository
 import com.example.stora.utils.TokenManager
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class AuthUiState(
     val isLoading: Boolean = false,
@@ -40,6 +45,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 isLoggedIn = true,
                 token = tokenManager.getToken()
             )
+            // Register FCM token for logged-in users on app start
+            registerFcmTokenAfterLogin()
         }
     }
 
@@ -59,6 +66,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                             fotoProfile = userData.fotoProfile
                         )
                     }
+
+                    // Register FCM token for push notifications
+                    registerFcmTokenAfterLogin()
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -306,6 +316,28 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     }
             } else {
                 onError("No authentication token found")
+            }
+        }
+    }
+
+    private fun registerFcmTokenAfterLogin() {
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                Log.d("AuthViewModel", "FCM Token obtained: $fcmToken")
+                
+                val authHeader = tokenManager.getAuthHeader()
+                if (authHeader != null) {
+                    val apiService = ApiConfig.provideApiService()
+                    val response = apiService.registerFcmToken(authHeader, FcmTokenRequest(fcmToken))
+                    if (response.isSuccessful) {
+                        Log.d("AuthViewModel", "FCM Token registered successfully with backend")
+                    } else {
+                        Log.e("AuthViewModel", "Failed to register FCM token: ${response.code()}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Error registering FCM token", e)
             }
         }
     }

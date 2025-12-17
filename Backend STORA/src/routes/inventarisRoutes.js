@@ -21,6 +21,7 @@ const inventarisValidationRules = [
 
 router.get('/', authMiddleware, inventarisController.getAllInventaris);
 router.get('/stats', authMiddleware, inventarisController.getInventarisStats);
+router.get('/:id/borrowed', authMiddleware, inventarisController.getBorrowedQuantity);
 router.get('/:id', authMiddleware, inventarisController.getInventarisById);
 router.post(
   '/',
