@@ -236,6 +236,57 @@ class InventoryRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
+                val authHeader = tokenManager.getAuthHeader()
+                
+                // If online and item has serverId, try to update on server first
+                if (authHeader != null && isOnline() && item.serverId != null) {
+                    Log.d(TAG, "Online mode: trying to update item on server first (serverId: ${item.serverId})")
+                    
+                    val request = item.toApiRequest(userId)
+                    
+                    try {
+                        val response = apiService.updateInventory(
+                            token = authHeader,
+                            id = item.serverId,
+                            inventoryRequest = request
+                        )
+                        
+                        Log.d(TAG, "Server update response code: ${response.code()}")
+                        
+                        if (response.isSuccessful && response.body()?.success == true) {
+                            // Server accepted - now save to Room
+                            val itemToSave = item.copy(
+                                userId = userId,
+                                needsSync = false,
+                                isSynced = true,
+                                lastModified = System.currentTimeMillis()
+                            )
+                            inventoryDao.updateInventoryItem(itemToSave)
+                            Log.d(TAG, "✓ Item updated on server and saved locally: ${item.name}")
+                            return@withContext Result.success(itemToSave)
+                        } else {
+                            // Server rejected - return error with message
+                            val errorBody = response.errorBody()?.string()
+                            Log.e(TAG, "Server rejected update: $errorBody")
+                            
+                            // Parse error message from server response
+                            val errorMessage = try {
+                                val jsonError = org.json.JSONObject(errorBody ?: "{}")
+                                jsonError.optString("message", "Gagal mengupdate data ke server")
+                            } catch (e: Exception) {
+                                "Gagal mengupdate data ke server (${response.code()})"
+                            }
+                            
+                            return@withContext Result.failure(Exception(errorMessage))
+                        }
+                    } catch (networkError: Exception) {
+                        Log.w(TAG, "Network error during update, will save locally for later sync: ${networkError.message}")
+                        // Network error - fall through to save locally
+                    }
+                }
+                
+                // Offline mode, no serverId, or network error - save locally with needsSync flag
+                Log.d(TAG, "Saving updated item locally for later sync")
                 val itemWithSyncFlag = item.copy(
                     userId = userId,
                     needsSync = true,
@@ -243,7 +294,7 @@ class InventoryRepository(
                     lastModified = System.currentTimeMillis()
                 )
                 inventoryDao.updateInventoryItem(itemWithSyncFlag)
-                Log.d(TAG, "Item updated locally: ${item.name}")
+                Log.d(TAG, "Item updated locally (will sync later): ${item.name}")
                 Result.success(itemWithSyncFlag)
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating item locally", e)
@@ -339,11 +390,19 @@ class InventoryRepository(
 
                         // Now add/update items from server
                         var syncedCount = 0
+                        var skippedCount = 0
                         serverItems.forEach { apiModel ->
                             try {
                                 
                                 val existingItem = apiModel.idInventaris?.let {
                                     inventoryDao.getInventoryItemByServerId(it)
+                                }
+
+                                // Skip update if local item has pending changes (needsSync = true)
+                                if (existingItem != null && existingItem.needsSync) {
+                                    Log.d(TAG, "⏭ Skipping server update for ${apiModel.namaBarang} - local changes pending")
+                                    skippedCount++
+                                    return@forEach  // Continue to next item
                                 }
 
                                 val localItem = if (existingItem != null) {
@@ -361,7 +420,7 @@ class InventoryRepository(
                             }
                         }
 
-                        Log.d(TAG, "✓ Sync from server completed: $syncedCount items synced, $deletedCount items deleted")
+                        Log.d(TAG, "✓ Sync from server completed: $syncedCount items synced, $deletedCount items deleted, $skippedCount items skipped (pending local changes)")
                         Result.success(syncedCount)
                     } else {
                         val errorMsg = responseBody?.message ?: "Sync failed with success=false"
@@ -513,7 +572,14 @@ class InventoryRepository(
                             } else {
                                 val errorBody = response.errorBody()?.string()
                                 Log.e(TAG, "✗ Create failed with code ${response.code()}: $errorBody")
-                                errorCount++
+                                
+                                // If server rejects with DUPLICATE_KODE_BARANG, delete from Room
+                                if (response.code() == 409 || errorBody?.contains("DUPLICATE_KODE_BARANG") == true) {
+                                    Log.w(TAG, "Duplicate detected by server, removing from local database: ${item.name}")
+                                    inventoryDao.deleteInventoryItem(item)
+                                } else {
+                                    errorCount++
+                                }
                             }
                         }
                     } catch (e: Exception) {

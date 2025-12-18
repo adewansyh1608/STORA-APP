@@ -276,14 +276,58 @@ class InventarisController {
       const { id } = req.params;
       const updateData = req.body;
 
+      console.log(`===== UPDATE INVENTARIS REQUEST (ID: ${id}) =====`);
+      console.log('Update Data:', JSON.stringify(updateData, null, 2));
 
       const whereClause = {
         ID_Inventaris: id
       };
 
-
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
+      }
+
+      // Check if Kode_Barang is being updated and if it would create a duplicate
+      if (updateData.Kode_Barang) {
+        // Normalize Kode_Barang for comparison (case-insensitive, remove leading zeros)
+        const normalizeKodeBarang = (kode) => {
+          if (!kode) return '';
+          const parts = kode.toString().toLowerCase().split(/[\\/\-_]/);
+          const normalizedParts = parts.map(part => {
+            if (/^\d+$/.test(part)) {
+              return parseInt(part, 10).toString();
+            }
+            return part.trim();
+          });
+          return normalizedParts.join('/');
+        };
+
+        const kodeBarang = updateData.Kode_Barang.toString().trim();
+        const normalizedInputKode = normalizeKodeBarang(kodeBarang);
+        console.log(`Checking duplicate for Kode_Barang: "${kodeBarang}" (normalized: "${normalizedInputKode}")`);
+
+        // Get all inventory items for this user EXCLUDING the current item
+        const userItems = await Inventaris.findAll({
+          where: {
+            ID_User: req.user.id,
+            ID_Inventaris: { [Op.ne]: parseInt(id) } // Exclude current item
+          },
+          attributes: ['ID_Inventaris', 'Kode_Barang']
+        });
+
+        const existingItem = userItems.find(item => {
+          const existingNormalized = normalizeKodeBarang(item.Kode_Barang);
+          return existingNormalized === normalizedInputKode;
+        });
+
+        if (existingItem) {
+          console.log(`✗ Duplicate Kode_Barang found: "${kodeBarang}" matches existing "${existingItem.Kode_Barang}"`);
+          return res.status(409).json({
+            success: false,
+            message: `Nomor Inventaris "${kodeBarang}" sudah ada (sama dengan "${existingItem.Kode_Barang}"). Silakan gunakan nomor yang berbeda.`,
+            code: 'DUPLICATE_KODE_BARANG'
+          });
+        }
       }
 
       const [updatedRowsCount] = await Inventaris.update(updateData, {

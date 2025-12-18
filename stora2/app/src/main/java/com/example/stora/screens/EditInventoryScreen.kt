@@ -147,6 +147,7 @@ fun EditItemForm(
     var showPhotoOptions by remember { mutableStateOf(false) }
     var showConditionDropdown by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     val conditionOptions = listOf("Baik", "Rusak Ringan", "Rusak Berat")
 
@@ -299,9 +300,9 @@ fun EditItemForm(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isError) {
+        if (isError && errorMessage.isNotEmpty()) {
             Text(
-                text = "Semua kolom harus diisi!",
+                text = errorMessage,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -398,11 +399,13 @@ fun EditItemForm(
                         },
                         onError = { error ->
                             isError = true
+                            errorMessage = error
                         }
                     )
-                    isError = false
+                    // Note: Don't clear error here - it's an async call
                 } else {
                     isError = true
+                    errorMessage = "Semua kolom harus diisi!"
                 }
             },
             modifier = Modifier
