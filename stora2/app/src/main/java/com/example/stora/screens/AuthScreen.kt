@@ -80,7 +80,8 @@ enum class AuthScreenState {
     WELCOME,
     LANDING,
     LOGIN,
-    SIGN_UP
+    SIGN_UP,
+    FORGOT_PASSWORD
 }
 
 @Composable
@@ -198,7 +199,19 @@ fun AuthScreen(
             ) {
                 LoginForm(
                     onSignUpClicked = { authScreenState = AuthScreenState.SIGN_UP },
+                    onForgotPasswordClicked = { authScreenState = AuthScreenState.FORGOT_PASSWORD },
                     navController = navController
+                )
+            }
+
+            this@Column.AnimatedVisibility(
+                visible = authScreenState == AuthScreenState.FORGOT_PASSWORD,
+                modifier = Modifier.fillMaxSize(),
+                enter = slideInVertically(animationSpec = tween(animationDuration)) { it } + fadeIn(),
+                exit = slideOutVertically(animationSpec = tween(animationDuration)) { it } + fadeOut()
+            ) {
+                ForgotPasswordForm(
+                    onBackToLoginClicked = { authScreenState = AuthScreenState.LOGIN }
                 )
             }
 
@@ -316,6 +329,7 @@ fun LandingButtons(onLoginClicked: () -> Unit, onSignUpClicked: () -> Unit) {
 @Composable
 fun LoginForm(
     onSignUpClicked: () -> Unit,
+    onForgotPasswordClicked: () -> Unit = {},
     navController: NavHostController,
     authViewModel: AuthViewModel = viewModel()
 ) {
@@ -364,7 +378,7 @@ fun LoginForm(
             color = Color.Gray,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { /* TODO: Handle Forgot Password */ },
+                .clickable { onForgotPasswordClicked() },
             textAlign = TextAlign.End
         )
 
@@ -620,6 +634,179 @@ fun SignUpForm(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun ForgotPasswordForm(
+    onBackToLoginClicked: () -> Unit,
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val uiState by authViewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    var email by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+
+    // Handle reset success
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess && !uiState.isLoggedIn) {
+            showSuccessDialog = true
+            authViewModel.clearState()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Reset Password",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = StoraBlueDark,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Masukkan email dan password baru Anda",
+                fontSize = 14.sp,
+                color = Color.Gray,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            StoraTextField(
+                label = "Email",
+                keyboardType = KeyboardType.Email,
+                value = email,
+                onValueChange = { email = it }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            StoraTextField(
+                label = "Password Baru",
+                isPassword = true,
+                value = newPassword,
+                onValueChange = { newPassword = it }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            StoraTextField(
+                label = "Konfirmasi Password",
+                isPassword = true,
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it }
+            )
+
+            // Password match validation
+            if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
+                Text(
+                    text = "Password tidak sama",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Error Message
+            uiState.errorMessage?.let { error ->
+                androidx.compose.material3.Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 14.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            Button(
+                onClick = {
+                    if (email.isNotBlank() && newPassword.isNotBlank() && newPassword == confirmPassword) {
+                        authViewModel.resetPassword(email.trim(), newPassword, confirmPassword)
+                    }
+                },
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = StoraBlueButton,
+                    contentColor = StoraWhite
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                enabled = !uiState.isLoading &&
+                        email.isNotBlank() &&
+                        newPassword.isNotBlank() &&
+                        newPassword == confirmPassword &&
+                        newPassword.length >= 6
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = StoraWhite
+                    )
+                } else {
+                    Text(text = "RESET PASSWORD", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Kembali ke Login",
+                color = StoraYellowButton,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.clickable { onBackToLoginClicked() }
+            )
+        }
+
+        // Success dialog
+        if (showSuccessDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {
+                    showSuccessDialog = false
+                    onBackToLoginClicked()
+                },
+                title = { Text("Berhasil") },
+                text = { Text("Password berhasil direset. Silakan login dengan password baru Anda.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showSuccessDialog = false
+                            onBackToLoginClicked()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = StoraBlueButton)
+                    ) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
     }
 }
 

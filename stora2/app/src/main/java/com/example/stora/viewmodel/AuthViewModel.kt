@@ -271,6 +271,29 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = AuthUiState()
     }
 
+    fun resetPassword(email: String, newPassword: String, confirmPassword: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+
+            authRepository.resetPassword(email, newPassword, confirmPassword)
+                .onSuccess { response ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        authResponse = response,
+                        errorMessage = null
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = false,
+                        errorMessage = exception.message
+                    )
+                }
+        }
+    }
+
     fun getUserId(): Int {
         return tokenManager.getUserId()
     }

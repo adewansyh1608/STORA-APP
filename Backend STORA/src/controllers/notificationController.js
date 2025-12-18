@@ -76,9 +76,29 @@ class NotificationController {
                 order: [['created_at', 'DESC']],
             });
 
+            // Transform data to return scheduled_datetime as timestamp (milliseconds)
+            // This ensures consistent time handling across different timezones
+            const transformedReminders = reminders.map(reminder => {
+                const plainReminder = reminder.toJSON();
+
+                // Convert scheduled_datetime to timestamp if it exists
+                if (plainReminder.scheduled_datetime) {
+                    const dateObj = new Date(plainReminder.scheduled_datetime);
+                    plainReminder.scheduled_datetime = dateObj.getTime().toString();
+                }
+
+                // Also convert last_notified to timestamp
+                if (plainReminder.last_notified) {
+                    const dateObj = new Date(plainReminder.last_notified);
+                    plainReminder.last_notified = dateObj.getTime().toString();
+                }
+
+                return plainReminder;
+            });
+
             res.status(200).json({
                 success: true,
-                data: reminders,
+                data: transformedReminders,
             });
         } catch (error) {
             console.error('Error getting reminders:', error);
@@ -149,12 +169,32 @@ class NotificationController {
             }
 
             // CREATE new reminder (for custom, or if no periodic exists)
+            // Handle scheduled_datetime - can be timestamp (number) or date string
+            let parsedDatetime = null;
+            if (reminder_type === 'custom' && scheduled_datetime) {
+                // Check if it's a numeric timestamp (milliseconds)
+                const numericValue = parseInt(scheduled_datetime, 10);
+                if (!isNaN(numericValue) && numericValue > 1000000000000) {
+                    // Milliseconds timestamp
+                    parsedDatetime = new Date(numericValue);
+                    console.log(`Parsed timestamp (ms): ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
+                } else if (!isNaN(numericValue) && numericValue > 1000000000) {
+                    // Seconds timestamp
+                    parsedDatetime = new Date(numericValue * 1000);
+                    console.log(`Parsed timestamp (s): ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
+                } else {
+                    // Date string
+                    parsedDatetime = new Date(scheduled_datetime);
+                    console.log(`Parsed date string: ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
+                }
+            }
+
             const reminderData = {
                 ID_User: userId,
                 reminder_type,
                 title: title || 'Pengingat Pengecekan Inventory',
                 periodic_months: reminder_type === 'periodic' ? (periodic_months || 3) : null,
-                scheduled_datetime: reminder_type === 'custom' ? new Date(scheduled_datetime) : null,
+                scheduled_datetime: parsedDatetime,
                 fcm_token,
                 is_active: true,
                 last_notified: reminder_type === 'periodic' ? new Date() : null,
@@ -298,6 +338,37 @@ class NotificationController {
             });
         } catch (error) {
             console.error('Error getting notification history:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message,
+            });
+        }
+    }
+
+    // Create notification history entry (for syncing local notifications to server)
+    async createNotificationHistory(req, res) {
+        try {
+            const userId = req.user.id;
+            const { Judul, Pesan, Tanggal, Status } = req.body;
+
+            const notification = await Notifikasi.create({
+                ID_User: userId,
+                Judul: Judul || 'Notifikasi',
+                Pesan: Pesan || '',
+                Tanggal: Tanggal || new Date().toISOString().split('T')[0],
+                Status: Status || 'sent',
+                isSynced: true,
+            });
+
+            console.log(`✓ Notification history created for user ${userId}: ${Judul}`);
+
+            res.status(201).json({
+                success: true,
+                message: 'Notification history created successfully',
+                data: notification,
+            });
+        } catch (error) {
+            console.error('Error creating notification history:', error);
             res.status(500).json({
                 success: false,
                 message: error.message,

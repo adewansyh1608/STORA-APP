@@ -3,6 +3,7 @@ package com.example.stora.network
 import com.example.stora.data.AuthResponse
 import com.example.stora.data.LoginRequest
 import com.example.stora.data.SignupRequest
+import com.example.stora.data.ResetPasswordRequest
 import com.example.stora.data.UpdateProfileRequest
 import com.example.stora.data.InventoryApiResponse
 import com.example.stora.data.InventoryApiModel
@@ -31,6 +32,11 @@ interface ApiService {
     @POST("logout")
     suspend fun logout(
         @Header("Authorization") token: String
+    ): Response<AuthResponse>
+
+    @POST("reset-password")
+    suspend fun resetPassword(
+        @Body resetPasswordRequest: ResetPasswordRequest
     ): Response<AuthResponse>
 
     @GET("profile")
@@ -254,4 +260,11 @@ interface ApiService {
     suspend fun getNotificationHistory(
         @Header("Authorization") token: String
     ): Response<com.example.stora.data.NotificationApiResponse<List<com.example.stora.data.NotificationHistoryApiModel>>>
+
+    // Create notification history (for syncing local notifications to server)
+    @POST("notifications/history")
+    suspend fun createNotificationHistory(
+        @Header("Authorization") token: String,
+        @Body request: Map<String, String>
+    ): Response<com.example.stora.data.NotificationApiResponse<com.example.stora.data.NotificationHistoryApiModel>>
 }

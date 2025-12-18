@@ -370,6 +370,69 @@ class AuthController {
       });
     }
   }
+
+  // Reset password (forgot password)
+  async resetPassword(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array().reduce((acc, error) => {
+            if (!acc[error.path]) {
+              acc[error.path] = [];
+            }
+            acc[error.path].push(error.msg);
+            return acc;
+          }, {})
+        });
+      }
+
+      const { email, new_password, confirm_password } = req.body;
+
+      // Check if passwords match
+      if (new_password !== confirm_password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password confirmation does not match',
+          errors: {
+            confirm_password: ['Password confirmation does not match new password']
+          }
+        });
+      }
+
+      // Find user by email
+      const user = await User.findOne({ where: { Email: email } });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Email tidak ditemukan',
+          errors: {
+            email: ['Email tidak terdaftar']
+          }
+        });
+      }
+
+      // Update password - pass PLAIN password, Sequelize hook will hash it
+      // The beforeUpdate hook in User model handles password hashing
+      await user.update({ Password: new_password });
+
+      res.status(200).json({
+        success: true,
+        message: 'Password berhasil direset',
+        data: null
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        errors: null
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();
+

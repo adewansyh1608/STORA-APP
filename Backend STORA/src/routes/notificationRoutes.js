@@ -13,6 +13,9 @@ router.post('/register-token', notificationController.registerToken);
 // Get notification history for current user
 router.get('/history', notificationController.getNotificationHistory);
 
+// Create notification history (for syncing local notifications to server)
+router.post('/history', notificationController.createNotificationHistory);
+
 // Get all reminders for current user
 router.get('/reminders', notificationController.getReminders);
 
@@ -28,7 +31,9 @@ router.post(
             .optional()
             .isInt({ min: 1, max: 12 })
             .withMessage('Periodic months must be between 1 and 12'),
-        body('scheduled_datetime').optional().isISO8601(),
+        // scheduled_datetime can be timestamp (number as string) or ISO8601 string
+        // Validation is handled in controller
+        body('scheduled_datetime').optional(),
         body('fcm_token').optional().isString(),
     ],
     notificationController.createReminder

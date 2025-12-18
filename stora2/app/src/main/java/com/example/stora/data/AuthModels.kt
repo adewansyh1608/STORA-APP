@@ -30,6 +30,15 @@ data class UpdateProfileRequest(
     val fotoProfile: String?
 )
 
+data class ResetPasswordRequest(
+    @SerializedName("email")
+    val email: String,
+    @SerializedName("new_password")
+    val newPassword: String,
+    @SerializedName("confirm_password")
+    val confirmPassword: String
+)
+
 // Response models
 data class AuthResponse(
     @SerializedName("success")

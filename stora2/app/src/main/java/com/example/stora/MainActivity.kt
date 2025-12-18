@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.example.stora.navigation.AppNavHost
+import com.example.stora.notification.ReminderScheduler
 import com.example.stora.ui.theme.STORATheme
 import com.example.stora.viewmodel.UserProfileViewModel
 
@@ -40,6 +41,10 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        // Schedule periodic reminder check using WorkManager
+        // This runs even when app is closed, allowing offline notifications
+        ReminderScheduler.schedulePeriodicCheck(this)
 
         setContent {
 

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.stora.data.*
 import com.example.stora.network.ApiConfig
@@ -35,6 +36,7 @@ import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellow
 import com.example.stora.utils.TokenManager
+import com.example.stora.viewmodel.NotificationViewModel
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -43,14 +45,21 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReminderSettingsScreen(navController: NavHostController) {
+fun ReminderSettingsScreen(
+    navController: NavHostController,
+    viewModel: NotificationViewModel = viewModel()
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val apiService = ApiConfig.provideApiService()
     val tokenManager = TokenManager.getInstance(context)
 
-    var reminders by remember { mutableStateOf<List<ReminderApiModel>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    // Collect state from ViewModel (data from Room database)
+    val reminders by viewModel.reminders.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+
     var fcmToken by remember { mutableStateOf<String?>(null) }
     var showPeriodicDialog by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
@@ -80,7 +89,7 @@ fun ReminderSettingsScreen(navController: NavHostController) {
         }
     }
 
-    // Get FCM token
+    // Get FCM token and register
     LaunchedEffect(Unit) {
         try {
             val token = FirebaseMessaging.getInstance().token.await()
@@ -93,130 +102,94 @@ fun ReminderSettingsScreen(navController: NavHostController) {
                 .putString("fcm_token", token)
                 .apply()
 
-            // Register token with backend
+            // Register token with backend (only if online)
             val authHeader = tokenManager.getAuthHeader()
             if (authHeader != null) {
-                apiService.registerFcmToken(authHeader, FcmTokenRequest(token))
+                try {
+                    apiService.registerFcmToken(authHeader, FcmTokenRequest(token))
+                } catch (e: Exception) {
+                    Log.e("ReminderSettings", "Error registering FCM token (offline?)", e)
+                }
             }
         } catch (e: Exception) {
             Log.e("ReminderSettings", "Error getting FCM token", e)
         }
     }
 
-    // Load reminders
-    fun loadReminders() {
-        scope.launch {
-            isLoading = true
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null) {
-                    val response = apiService.getReminders(authHeader)
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        reminders = response.body()?.data ?: emptyList()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ReminderSettings", "Error loading reminders", e)
-                errorMessage = "Gagal memuat pengingat: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
+    // Sync on screen load
     LaunchedEffect(Unit) {
-        loadReminders()
+        viewModel.syncData()
     }
 
-    // Create or update periodic reminder
+    // Refresh network status periodically
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5000)
+            viewModel.refreshNetworkStatus()
+        }
+    }
+
+    // Create or update periodic reminder using ViewModel (works offline!)
     fun createPeriodicReminder(months: Int) {
-        scope.launch {
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null && fcmToken != null) {
-                    val request = ReminderRequest(
-                        reminderType = "periodic",
-                        title = "Pengingat Pengecekan Inventory",
-                        periodicMonths = months,
-                        fcmToken = fcmToken
-                    )
-                    val response = apiService.createReminder(authHeader, request)
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        // Show message from server (could be create or update)
-                        val message = response.body()?.message ?: "Pengingat periodik berhasil disimpan"
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        loadReminders()
-                    } else {
-                        Toast.makeText(context, "Gagal menyimpan pengingat", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+        viewModel.savePeriodicReminder(
+            months = months,
+            onSuccess = {
+                val statusMsg = if (isOnline) "Pengingat periodik berhasil disimpan" else "Tersimpan lokal (akan sync)"
+                Toast.makeText(context, statusMsg, Toast.LENGTH_SHORT).show()
+            },
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             }
-            showPeriodicDialog = false
-        }
+        )
+        showPeriodicDialog = false
     }
 
-    // Create custom reminder
+    // Create custom reminder using ViewModel (works offline!)
     fun createCustomReminder(datetime: String, title: String) {
-        scope.launch {
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null && fcmToken != null) {
-                    val request = ReminderRequest(
-                        reminderType = "custom",
-                        title = title.ifEmpty { "Pengingat Pengecekan Inventory" },
-                        scheduledDatetime = datetime,
-                        fcmToken = fcmToken
-                    )
-                    val response = apiService.createReminder(authHeader, request)
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        Toast.makeText(context, "Pengingat kustom berhasil dibuat", Toast.LENGTH_SHORT).show()
-                        loadReminders()
-                    } else {
-                        Toast.makeText(context, "Gagal membuat pengingat", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-            showCustomDialog = false
+        // Parse datetime string to timestamp
+        val timestamp = try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+            sdf.timeZone = TimeZone.getTimeZone("UTC")
+            sdf.parse(datetime)?.time ?: System.currentTimeMillis()
+        } catch (e: Exception) {
+            System.currentTimeMillis()
         }
+
+        viewModel.saveCustomReminder(
+            title = title,
+            scheduledDatetime = timestamp,
+            onSuccess = {
+                val statusMsg = if (isOnline) "Pengingat kustom berhasil dibuat" else "Tersimpan lokal (akan sync)"
+                Toast.makeText(context, statusMsg, Toast.LENGTH_SHORT).show()
+            },
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+            }
+        )
+        showCustomDialog = false
     }
 
-    // Delete reminder
-    fun deleteReminder(id: Int) {
-        scope.launch {
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null) {
-                    val response = apiService.deleteReminder(authHeader, id)
-                    if (response.isSuccessful) {
-                        Toast.makeText(context, "Pengingat dihapus", Toast.LENGTH_SHORT).show()
-                        loadReminders()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+    // Delete reminder using ViewModel (works offline!)
+    fun deleteReminder(id: String) {
+        viewModel.deleteReminder(
+            id = id,
+            onSuccess = {
+                Toast.makeText(context, "Pengingat dihapus", Toast.LENGTH_SHORT).show()
+            },
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             }
-        }
+        )
     }
 
-    // Toggle reminder
-    fun toggleReminder(id: Int) {
-        scope.launch {
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null) {
-                    val response = apiService.toggleReminder(authHeader, id)
-                    if (response.isSuccessful) {
-                        loadReminders()
-                    }
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+    // Toggle reminder using ViewModel (works offline!)
+    fun toggleReminder(reminder: ReminderEntity) {
+        viewModel.toggleReminder(
+            reminder = reminder,
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             }
-        }
+        )
     }
 
 
@@ -230,12 +203,24 @@ fun ReminderSettingsScreen(navController: NavHostController) {
         // Top Bar with proper back navigation
         TopAppBar(
             title = {
-                Text(
-                    text = "Pengingat Inventory",
-                    color = StoraYellow,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Pengingat Inventory",
+                        color = StoraYellow,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    // Show offline indicator
+                    if (!isOnline) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            Icons.Default.CloudOff,
+                            contentDescription = "Offline",
+                            tint = Color.Yellow,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             },
             navigationIcon = {
                 IconButton(onClick = { navController.navigateUp() }) {
@@ -374,11 +359,11 @@ fun ReminderSettingsScreen(navController: NavHostController) {
                             }
                         }
                     } else {
-                        items(reminders) { reminder ->
-                            ReminderCard(
+                        items(reminders.filter { !it.isDeleted }) { reminder ->
+                            ReminderCardEntity(
                                 reminder = reminder,
-                                onToggle = { toggleReminder(reminder.idReminder) },
-                                onDelete = { deleteReminder(reminder.idReminder) }
+                                onToggle = { toggleReminder(reminder) },
+                                onDelete = { deleteReminder(reminder.id) }
                             )
                         }
                     }
@@ -412,8 +397,8 @@ fun ReminderSettingsScreen(navController: NavHostController) {
 }
 
 @Composable
-fun ReminderCard(
-    reminder: ReminderApiModel,
+fun ReminderCardEntity(
+    reminder: ReminderEntity,
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -440,16 +425,28 @@ fun ReminderCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = reminder.title ?: "Pengingat Inventory",
-                    fontWeight = FontWeight.Bold,
-                    color = if (reminder.isActive) StoraBlueDark else Color.Gray
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = reminder.title ?: "Pengingat Inventory",
+                        fontWeight = FontWeight.Bold,
+                        color = if (reminder.isActive) StoraBlueDark else Color.Gray
+                    )
+                    // Show sync status indicator
+                    if (reminder.needsSync) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.Sync,
+                            contentDescription = "Belum tersinkron",
+                            tint = Color(0xFFFFA000),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
                 Text(
                     text = if (reminder.reminderType == "periodic") {
                         "Setiap ${reminder.periodicMonths} bulan"
                     } else {
-                        formatDateTime(reminder.scheduledDatetime)
+                        formatDateTimeLong(reminder.scheduledDatetime)
                     },
                     fontSize = 14.sp,
                     color = Color.Gray
@@ -767,5 +764,17 @@ private fun formatDateTime(datetime: String?): String {
         outputFormat.format(date!!)
     } catch (e: Exception) {
         datetime
+    }
+}
+
+// Overload for Long timestamp (used by ReminderEntity)
+private fun formatDateTimeLong(timestamp: Long?): String {
+    if (timestamp == null) return "Tidak diatur"
+    return try {
+        val date = Date(timestamp)
+        val outputFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
+        outputFormat.format(date)
+    } catch (e: Exception) {
+        "Tidak valid"
     }
 }

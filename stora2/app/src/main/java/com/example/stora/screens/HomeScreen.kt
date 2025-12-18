@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Card
@@ -64,16 +66,20 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.stora.data.LoansData
+import com.example.stora.data.NotificationHistoryEntity
 import com.example.stora.data.NotificationHistoryApiModel
 import com.example.stora.network.ApiConfig
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.utils.TokenManager
+import com.example.stora.viewmodel.NotificationViewModel
 import com.example.stora.viewmodel.UserProfileViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
@@ -84,7 +90,8 @@ import java.util.TimeZone
 fun HomeScreen(
     navController: NavHostController,
     userProfileViewModel: UserProfileViewModel,
-    inventoryViewModel: com.example.stora.viewmodel.InventoryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    inventoryViewModel: com.example.stora.viewmodel.InventoryViewModel = viewModel(),
+    notificationViewModel: NotificationViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -94,30 +101,25 @@ fun HomeScreen(
     var isReminderExpanded by rememberSaveable { mutableStateOf(false) }
     val inventoryItems by inventoryViewModel.inventoryItems.collectAsState()
 
-    // State untuk notification history
-    var notificationHistory by remember { mutableStateOf<List<NotificationHistoryApiModel>>(emptyList()) }
-    var isLoadingNotifications by remember { mutableStateOf(true) }
+    // State from NotificationViewModel (data from Room database - works offline!)
+    val notificationHistory by notificationViewModel.notificationHistory.collectAsState()
+    val isLoading by notificationViewModel.isLoading.collectAsState()
+    val isOnline by notificationViewModel.isOnline.collectAsState()
 
-    // Load notification history from API
+    // Load profile and sync notifications on mount
     LaunchedEffect(Unit) {
         // Reload profile from TokenManager to get latest data
         userProfileViewModel.loadProfileFromToken()
         
-        scope.launch {
-            try {
-                val authHeader = tokenManager.getAuthHeader()
-                if (authHeader != null) {
-                    val response = apiService.getNotificationHistory(authHeader)
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        notificationHistory = response.body()?.data ?: emptyList()
-                        Log.d("HomeScreen", "Loaded ${notificationHistory.size} notifications")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("HomeScreen", "Error loading notification history", e)
-            } finally {
-                isLoadingNotifications = false
-            }
+        // Sync notifications (loads from Room, syncs with server if online)
+        notificationViewModel.syncData()
+    }
+
+    // Refresh network status periodically
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5000)
+            notificationViewModel.refreshNetworkStatus()
         }
     }
 
@@ -193,7 +195,7 @@ fun HomeScreen(
                     }
 
                     // Loading indicator
-                    if (isLoadingNotifications) {
+                    if (isLoading) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -205,7 +207,7 @@ fun HomeScreen(
                             }
                         }
                     } else if (notificationHistory.isEmpty()) {
-                        // Empty state
+                        // Empty state with offline indicator
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -218,18 +220,29 @@ fun HomeScreen(
                                         .padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "Belum ada notifikasi.\nBuat pengingat untuk memulai.",
-                                        color = Color.Gray,
-                                        textAlign = TextAlign.Center
-                                    )
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (!isOnline) {
+                                            Icon(
+                                                Icons.Default.CloudOff,
+                                                contentDescription = "Offline",
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                        }
+                                        Text(
+                                            text = if (!isOnline) "Mode Offline\nData notifikasi kosong" else "Belum ada notifikasi.\nBuat pengingat untuk memulai.",
+                                            color = Color.Gray,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
                                 }
                             }
                         }
                     } else {
-                        // Daftar Item Notification dari database
+                        // Daftar Item Notification dari Room database (works offline!)
                         items(notificationHistory) { notification ->
-                            NotificationHistoryItem(notification = notification)
+                            NotificationHistoryEntityItem(notification = notification)
                         }
                     }
 
@@ -507,5 +520,97 @@ private fun formatNotificationDate(dateStr: String): String {
         outputFormat.format(date!!)
     } catch (e: Exception) {
         dateStr
+    }
+}
+
+/**
+ * Satu item untuk NotificationHistoryEntity dari Room database
+ */
+@Composable
+private fun NotificationHistoryEntityItem(notification: NotificationHistoryEntity) {
+    // Determine if this is a loan deadline notification
+    val isLoanNotification = notification.title?.contains("Deadline") == true || 
+                              notification.title?.contains("Pengembalian") == true ||
+                              notification.message?.contains("pengembalian") == true ||
+                              notification.message?.contains("peminjaman") == true
+    
+    val iconColor = if (isLoanNotification) Color(0xFFE65100) else StoraBlueDark
+    val bgColor = if (isLoanNotification) Color(0xFFFFF3E0) else StoraBlueDark.copy(alpha = 0.1f)
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bgColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isLoanNotification) Icons.AutoMirrored.Outlined.ReceiptLong else Icons.Outlined.Inventory2,
+                    contentDescription = "Notification",
+                    tint = iconColor,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = notification.title ?: "Notifikasi",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = if (isLoanNotification) Color(0xFFE65100) else StoraBlueDark
+                    )
+                    // Show sync indicator if not synced
+                    if (notification.needsSync) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.Sync,
+                            contentDescription = "Belum tersinkron",
+                            tint = Color(0xFFFFA000),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = notification.message ?: "",
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
+                // Tampilkan tanggal dari timestamp
+                Text(
+                    text = formatNotificationTimestamp(notification.timestamp),
+                    fontSize = 12.sp,
+                    color = Color.Gray.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Format timestamp untuk ditampilkan
+ */
+private fun formatNotificationTimestamp(timestamp: Long): String {
+    return try {
+        val date = Date(timestamp)
+        val outputFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
+        outputFormat.format(date)
+    } catch (e: Exception) {
+        "Tanggal tidak valid"
     }
 }

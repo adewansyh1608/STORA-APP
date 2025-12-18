@@ -102,13 +102,25 @@ class ReminderScheduler {
             console.log(`Found ${periodicReminders.length} active periodic reminders`);
 
             for (const reminder of periodicReminders) {
-                const lastNotified = reminder.last_notified ? new Date(reminder.last_notified) : new Date(0);
-                const monthsSinceLastNotified = this.getMonthsDifference(lastNotified, now);
+                // FIXED: Use last_notified if exists, otherwise use created_at as baseline
+                // This prevents new reminders from immediately firing
+                let baseline;
+                if (reminder.last_notified) {
+                    baseline = new Date(reminder.last_notified);
+                } else if (reminder.created_at) {
+                    baseline = new Date(reminder.created_at);
+                } else {
+                    // Fallback to now - should not happen but just in case
+                    baseline = now;
+                }
 
-                console.log(`Periodic reminder ${reminder.ID_Reminder}: last_notified=${lastNotified.toISOString()}, months_since=${monthsSinceLastNotified}, periodic_months=${reminder.periodic_months}`);
+                const monthsSinceBaseline = this.getMonthsDifference(baseline, now);
 
-                if (monthsSinceLastNotified >= reminder.periodic_months) {
-                    console.log(`Sending periodic reminder ${reminder.ID_Reminder} (${monthsSinceLastNotified} months since last)`);
+                console.log(`Periodic reminder ${reminder.ID_Reminder}: baseline=${baseline.toISOString()}, months_since=${monthsSinceBaseline}, periodic_months=${reminder.periodic_months}`);
+
+                // Only fire if enough months have passed since baseline
+                if (monthsSinceBaseline >= reminder.periodic_months) {
+                    console.log(`✓ Sending periodic reminder ${reminder.ID_Reminder} (${monthsSinceBaseline} months since baseline)`);
 
                     // Send to ALL user devices (multi-device support)
                     const result = await this.sendToAllUserDevices(
@@ -126,6 +138,8 @@ class ReminderScheduler {
                         await reminder.update({ last_notified: now });
                         console.log(`✓ Periodic reminder ${reminder.ID_Reminder} sent to all devices and updated`);
                     }
+                } else {
+                    console.log(`⏭ Skipping periodic reminder ${reminder.ID_Reminder} - only ${monthsSinceBaseline} months since baseline, needs ${reminder.periodic_months}`);
                 }
             }
         } catch (error) {
