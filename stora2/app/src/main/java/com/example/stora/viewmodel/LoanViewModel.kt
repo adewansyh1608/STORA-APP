@@ -292,6 +292,68 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Delete active loan
+    fun deleteLoan(
+        loanId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val result = loanRepository.deleteLoan(loanId)
+                result.fold(
+                    onSuccess = {
+                        Log.d(TAG, "Loan deleted successfully")
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Error deleting loan", error)
+                        onError(error.message ?: "Unknown error")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception deleting loan", e)
+                onError(e.message ?: "Unknown error")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // Update loan deadline and item quantities
+    fun updateLoan(
+        loanId: String,
+        newDeadline: String,
+        itemQuantities: Map<String, Int>,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val result = loanRepository.updateLoan(loanId, newDeadline, itemQuantities)
+                result.fold(
+                    onSuccess = {
+                        Log.d(TAG, "Loan updated successfully")
+                        // Refresh data to reflect changes
+                        loadActiveLoans()
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Error updating loan", error)
+                        onError(error.message ?: "Unknown error")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception updating loan", e)
+                onError(e.message ?: "Unknown error")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     suspend fun getLoanById(loanId: String): LoanWithItems? {
         return loanRepository.getLoanById(loanId)
     }

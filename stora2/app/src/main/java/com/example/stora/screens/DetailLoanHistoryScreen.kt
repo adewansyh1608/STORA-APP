@@ -127,15 +127,6 @@ fun DetailLoanHistoryScreen(
                         )
                     }
                 },
-                actions = {
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Delete",
-                            tint = StoraWhite
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = StoraBlueDark
                 )

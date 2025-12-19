@@ -21,7 +21,7 @@ const Notifikasi = sequelize.define(
       field: 'Pesan',
     },
     Tanggal: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: true,
       field: 'Tanggal',
     },

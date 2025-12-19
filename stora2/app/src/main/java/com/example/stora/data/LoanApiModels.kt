@@ -127,7 +127,9 @@ data class LoanStatusUpdateRequest(
     @SerializedName("Status")
     val status: String,
     @SerializedName("Tanggal_Dikembalikan")
-    val tanggalDikembalikan: String? = null
+    val tanggalDikembalikan: String? = null,
+    @SerializedName("Tanggal_Kembali")
+    val tanggalKembali: String? = null
 )
 
 // ==================== EXTENSION FUNCTIONS ====================

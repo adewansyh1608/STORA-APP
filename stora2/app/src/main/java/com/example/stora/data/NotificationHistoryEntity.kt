@@ -56,10 +56,28 @@ data class NotificationHistoryEntity(
         fun fromApiModel(apiModel: NotificationHistoryApiModel, localId: String? = null, userId: Int): NotificationHistoryEntity {
             val timestamp = apiModel.tanggal?.let {
                 try {
-                    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
+                    // Try datetime format first (with time)
+                    val dateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                    dateTimeFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    dateTimeFormat.parse(it)?.time
+                        ?: try {
+                            // Try alternative format without milliseconds
+                            val altFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                            altFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                            altFormat.parse(it)?.time
+                        } catch (e: Exception) {
+                            // Fallback to date-only format
+                            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
+                        }
                         ?: System.currentTimeMillis()
                 } catch (e: Exception) {
-                    System.currentTimeMillis()
+                    // Fallback to date-only format
+                    try {
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
+                            ?: System.currentTimeMillis()
+                    } catch (e2: Exception) {
+                        System.currentTimeMillis()
+                    }
                 }
             } ?: System.currentTimeMillis()
             

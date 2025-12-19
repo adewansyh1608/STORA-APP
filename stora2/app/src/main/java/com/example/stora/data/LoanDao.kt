@@ -76,6 +76,9 @@ interface LoanDao {
     @Query("UPDATE loan_items SET serverId = :serverId WHERE id = :itemId")
     suspend fun updateLoanItemServerId(itemId: String, serverId: Int)
 
+    @Query("UPDATE loan_items SET jumlah = :quantity WHERE id = :itemId")
+    suspend fun updateLoanItemQuantity(itemId: String, quantity: Int)
+
     // ==================== COMBINED QUERIES ====================
     
     @Transaction

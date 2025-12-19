@@ -360,6 +360,112 @@ class LoanRepository(
         }
     }
 
+    // Delete active loan (same as deleteLoanHistory but also updates inventory)
+    suspend fun deleteLoan(loanId: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val loan = loanDao.getLoanById(loanId)
+                    ?: return@withContext Result.failure(Exception("Loan not found"))
+                
+                Log.d(TAG, "Deleting active loan: $loanId")
+                
+                // Use the same logic as deleteLoanHistory
+                deleteLoanHistory(loanId, loan.serverId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting active loan", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    // Update loan deadline and item quantities
+    suspend fun updateLoan(
+        loanId: String,
+        newDeadline: String,
+        itemQuantities: Map<String, Int>
+    ): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val loan = loanDao.getLoanById(loanId)
+                    ?: return@withContext Result.failure(Exception("Loan not found"))
+                
+                Log.d(TAG, "Updating loan: $loanId, newDeadline: $newDeadline, itemQuantities: $itemQuantities")
+                
+                // Update loan deadline in Room
+                val updatedLoan = loan.copy(
+                    tanggalKembali = newDeadline,
+                    needsSync = true,
+                    lastModified = System.currentTimeMillis()
+                )
+                loanDao.insertLoan(updatedLoan)
+                
+                // Update item quantities in Room
+                itemQuantities.forEach { (itemId, quantity) ->
+                    loanDao.updateLoanItemQuantity(itemId, quantity)
+                    Log.d(TAG, "Updated item $itemId quantity to $quantity")
+                }
+                
+                // Try to sync to server
+                loan.serverId?.let { serverId ->
+                    try {
+                        val authHeader = getAuthToken()
+                        if (authHeader != null) {
+                            // Convert date format for API
+                            val dateOnlyFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                            val dateTimeFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                            val apiDateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                            val apiDateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                            
+                            val parsedDate = try {
+                                if (newDeadline.contains(":")) {
+                                    dateTimeFormat.parse(newDeadline)
+                                } else {
+                                    dateOnlyFormat.parse(newDeadline)
+                                }
+                            } catch (e: Exception) {
+                                null
+                            }
+                            
+                            val apiFormattedDate = parsedDate?.let {
+                                if (newDeadline.contains(":")) {
+                                    apiDateTimeFormat.format(it)
+                                } else {
+                                    apiDateFormat.format(it)
+                                }
+                            } ?: newDeadline
+                            
+                            // Update peminjaman on server
+                            val response = apiService.updatePeminjamanStatus(
+                                token = authHeader,
+                                id = serverId,
+                                request = LoanStatusUpdateRequest(
+                                    status = loan.status,
+                                    tanggalDikembalikan = null,
+                                    tanggalKembali = apiFormattedDate
+                                )
+                            )
+                            
+                            if (response.isSuccessful) {
+                                loanDao.markLoanAsSynced(loanId)
+                                Log.d(TAG, "Loan update synced to server")
+                            } else {
+                                Log.e(TAG, "Failed to sync loan update: ${response.errorBody()?.string()}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error syncing loan update to server", e)
+                        // Don't throw - local update succeeded
+                    }
+                }
+                
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating loan", e)
+                Result.failure(e)
+            }
+        }
+    }
+
     // ==================== SYNC OPERATIONS ====================
 
     // Helper: Convert URI to File
