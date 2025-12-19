@@ -51,6 +51,8 @@ router.post('/with-photos', authMiddleware, peminjamanUpload.array('photos', 10)
 router.patch('/:id/status', authMiddleware, statusValidationRules, peminjamanController.updatePeminjamanStatus);
 // Upload return photos for a peminjaman
 router.patch('/:id/return-photos', authMiddleware, peminjamanUpload.array('photos', 10), peminjamanController.uploadReturnPhotos);
+// Update peminjaman (deadline and items)
+router.put('/:id', authMiddleware, peminjamanController.updatePeminjaman);
 // Delete peminjaman
 router.delete('/:id', authMiddleware, peminjamanController.deletePeminjaman);
 

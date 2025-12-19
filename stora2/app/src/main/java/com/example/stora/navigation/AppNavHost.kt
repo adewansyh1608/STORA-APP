@@ -401,5 +401,30 @@ fun AppNavHost(
         ) {
             com.example.stora.screens.ReminderSettingsScreen(navController = navController)
         }
+
+        composable(
+            route = Routes.EDIT_LOAN_SCREEN,
+            arguments = listOf(
+                navArgument("loanId") { type = NavType.StringType }
+            ),
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(500)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(500)
+                )
+            }
+        ) { backStackEntry ->
+            val loanId = backStackEntry.arguments?.getString("loanId") ?: ""
+            com.example.stora.screens.EditLoanScreen(
+                navController = navController,
+                loanId = loanId
+            )
+        }
     }
 }

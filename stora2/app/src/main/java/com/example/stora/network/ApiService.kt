@@ -12,6 +12,7 @@ import com.example.stora.data.LoanApiResponse
 import com.example.stora.data.LoanApiModel
 import com.example.stora.data.LoanCreateRequest
 import com.example.stora.data.LoanStatusUpdateRequest
+import com.example.stora.data.LoanUpdateRequest
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
@@ -187,6 +188,14 @@ interface ApiService {
         @Body request: LoanStatusUpdateRequest
     ): Response<LoanApiResponse<LoanApiModel>>
 
+    // Update peminjaman (deadline and items)
+    @PUT("peminjaman/{id}")
+    suspend fun updatePeminjaman(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body request: LoanUpdateRequest
+    ): Response<LoanApiResponse<LoanApiModel>>
+
     // Get peminjaman statistics
     @GET("peminjaman/stats")
     suspend fun getPeminjamanStats(
@@ -265,6 +274,6 @@ interface ApiService {
     @POST("notifications/history")
     suspend fun createNotificationHistory(
         @Header("Authorization") token: String,
-        @Body request: Map<String, String>
+        @Body request: Map<String, Any>
     ): Response<com.example.stora.data.NotificationApiResponse<com.example.stora.data.NotificationHistoryApiModel>>
 }

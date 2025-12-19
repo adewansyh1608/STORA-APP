@@ -8,10 +8,10 @@ interface LoanDao {
     
     // ==================== LOAN QUERIES ====================
     
-    @Query("SELECT * FROM loans WHERE userId = :userId AND status NOT IN ('Selesai', 'Terlambat') ORDER BY lastModified DESC")
+    @Query("SELECT * FROM loans WHERE userId = :userId AND status NOT IN ('Selesai', 'Terlambat') AND isDeleted = 0 ORDER BY lastModified DESC")
     fun getActiveLoans(userId: Int): Flow<List<LoanEntity>>
     
-    @Query("SELECT * FROM loans WHERE userId = :userId AND status IN ('Selesai', 'Terlambat') ORDER BY lastModified DESC")
+    @Query("SELECT * FROM loans WHERE userId = :userId AND status IN ('Selesai', 'Terlambat') AND isDeleted = 0 ORDER BY lastModified DESC")
     fun getLoanHistory(userId: Int): Flow<List<LoanEntity>>
     
     @Query("SELECT * FROM loans WHERE userId = :userId ORDER BY lastModified DESC")
@@ -28,6 +28,18 @@ interface LoanDao {
 
     @Query("SELECT COUNT(*) FROM loans WHERE userId = :userId AND needsSync = 1")
     suspend fun getUnsyncedLoanCount(userId: Int): Int
+
+    // Get deleted loans that need to be synced to server
+    @Query("SELECT * FROM loans WHERE userId = :userId AND isDeleted = 1 AND serverId IS NOT NULL")
+    suspend fun getDeletedLoansToSync(userId: Int): List<LoanEntity>
+    
+    // Soft delete a loan (mark as deleted for sync later)
+    @Query("UPDATE loans SET isDeleted = 1, needsSync = 1, lastModified = :lastModified WHERE id = :loanId")
+    suspend fun softDeleteLoan(loanId: String, lastModified: Long)
+    
+    // Update loan deadline and mark for sync
+    @Query("UPDATE loans SET tanggalKembali = :deadline, needsSync = 1, lastModified = :lastModified WHERE id = :loanId")
+    suspend fun updateLoanDeadline(loanId: String, deadline: String, lastModified: Long)
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoan(loan: LoanEntity)

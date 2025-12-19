@@ -150,7 +150,7 @@ fun PhotoInputSection(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(if (photoUri != null) 200.dp else 120.dp) // Taller when photo exists
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFFF5F5F5))
                 .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
@@ -162,7 +162,7 @@ fun PhotoInputSection(
                     model = photoUri,
                     contentDescription = "Foto Barang",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Fit // Proportional like detail screen
                 )
             } else {
                 Column(

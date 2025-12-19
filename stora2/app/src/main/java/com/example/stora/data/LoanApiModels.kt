@@ -130,6 +130,13 @@ data class LoanStatusUpdateRequest(
     val tanggalDikembalikan: String? = null
 )
 
+data class LoanUpdateRequest(
+    @SerializedName("Tanggal_Kembali")
+    val tanggalKembali: String? = null,
+    @SerializedName("barangList")
+    val barangList: List<LoanBarangRequest>? = null
+)
+
 // ==================== EXTENSION FUNCTIONS ====================
 
 /**

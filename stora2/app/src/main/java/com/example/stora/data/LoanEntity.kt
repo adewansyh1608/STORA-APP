@@ -21,6 +21,7 @@ data class LoanEntity(
     val userId: Int = -1,
     val isSynced: Boolean = false,
     val needsSync: Boolean = false,
+    val isDeleted: Boolean = false, // For soft delete during offline mode
     val lastModified: Long = System.currentTimeMillis()
 )
 

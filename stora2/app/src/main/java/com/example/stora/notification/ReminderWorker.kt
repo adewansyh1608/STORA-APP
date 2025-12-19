@@ -81,29 +81,48 @@ class ReminderWorker(
                     val shouldFireLocally = !isOnline // Only fire when offline
                     
                     if (shouldFireLocally) {
+                        // Check for existing notification (deduplication)
+                        val scheduledTime = reminder.scheduledDatetime ?: System.currentTimeMillis()
+                        val calendar = java.util.Calendar.getInstance()
+                        calendar.timeInMillis = scheduledTime
+                        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        calendar.set(java.util.Calendar.MINUTE, 0)
+                        calendar.set(java.util.Calendar.SECOND, 0)
+                        calendar.set(java.util.Calendar.MILLISECOND, 0)
+                        val startOfDay = calendar.timeInMillis
+                        calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                        val endOfDay = calendar.timeInMillis
+                        
+                        val existingNotification = database.notificationHistoryDao()
+                            .getNotificationByReminderAndDate(userId, reminder.id, startOfDay, endOfDay)
+                        
+                        if (existingNotification != null) {
+                            Log.d(TAG, "⏭ Notification already exists for ${reminder.title}, skipping")
+                            return@forEach
+                        }
+                        
                         Log.d(TAG, "🔔 Firing local notification for: ${reminder.title} (${reminder.reminderType})")
                         showNotification(reminder)
                         
                         // Update last notified timestamp
                         repository.updateLastNotified(reminder.id)
                         
-                        // Record to notification history
+                        // Record to notification history with standardized message
                         val title = reminder.title ?: "Pengingat Pengecekan Inventory"
-                        val message = when (reminder.reminderType) {
-                            "periodic" -> "Sudah waktunya untuk melakukan pengecekan inventory Anda!"
-                            "custom" -> "Waktu pengingat: $title"
-                            else -> "Anda memiliki pengingat yang perlu diperhatikan"
-                        }
+                        // Standardized message format to match online notification
+                        val message = "Waktu pengingat: $title"
                         
                         repository.recordLocalNotification(
                             title = title,
                             message = message,
-                            relatedReminderId = reminder.id
+                            timestamp = scheduledTime,
+                            relatedReminderId = reminder.id,
+                            serverReminderId = reminder.serverId
                         )
                         
                         Log.d(TAG, "✓ LOCAL notification fired for: ${reminder.title}")
                     } else {
-                        Log.d(TAG, "⏭ Skipping local notification for periodic (online, Firebase will handle)")
+                        Log.d(TAG, "⏭ Skipping local notification (online, Firebase will handle)")
                     }
                 }
                 

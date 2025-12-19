@@ -76,6 +76,8 @@ data class NotificationHistoryApiModel(
     val idUser: Int?,
     @SerializedName("ID_Peminjaman")
     val idPeminjaman: Int?,
+    @SerializedName("ID_Reminder")
+    val idReminder: Int?,
     @SerializedName("isSynced")
     val isSynced: Boolean?
 )

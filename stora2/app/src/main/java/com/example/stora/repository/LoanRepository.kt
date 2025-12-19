@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.stora.data.*
+import com.example.stora.notification.ReminderAlarmManager
 import com.example.stora.network.ApiService
 import com.example.stora.utils.TokenManager
 import kotlinx.coroutines.Dispatchers
@@ -146,6 +147,9 @@ class LoanRepository(
                 loanDao.insertLoanWithItems(loan, loanItems)
                 Log.d(TAG, "Loan saved to Room: ${loan.id} with ${loanItems.size} items")
 
+                // Schedule loan deadline alarms for offline notifications
+                scheduleLoanAlarmsInternal(loan)
+
                 // Try to sync to server
                 Log.d(TAG, "Attempting to sync loan to server...")
                 syncLoanToServer(loan, loanItems)
@@ -220,6 +224,10 @@ class LoanRepository(
                     returnDate = returnDate,
                     lastModified = System.currentTimeMillis()
                 )
+
+                // Cancel loan deadline alarms since loan is returned
+                ReminderAlarmManager.cancelLoanAlarms(context, loanId)
+                Log.d(TAG, "Cancelled loan alarms for returned loan")
 
                 // Update each item's return image in Room
                 itemReturnImages.forEach { (itemId, returnImageUri) ->
@@ -316,47 +324,241 @@ class LoanRepository(
         }
     }
 
-    suspend fun deleteLoanHistory(loanId: String, serverId: Int? = null): Result<Unit> {
+    /**
+     * Update loan deadline and/or items.
+     * Works offline - changes are synced when online.
+     */
+    suspend fun updateLoan(
+        loanId: String,
+        newDeadline: String?,
+        newItems: List<LoanItemInfo>?
+    ): Result<LoanWithItems> {
         return withContext(Dispatchers.IO) {
             try {
-                // Get serverId from loan if not provided
-                val actualServerId = serverId ?: loanDao.getLoanById(loanId)?.serverId
+                val loan = loanDao.getLoanById(loanId)
+                    ?: return@withContext Result.failure(Exception("Loan not found"))
                 
-                // Try to delete from server first
-                actualServerId?.let { sid ->
-                    try {
-                        val authHeader = getAuthToken()
-                        if (authHeader != null) {
-                            val response = apiService.deletePeminjaman(
-                                token = authHeader,
-                                id = sid
-                            )
-                            if (!response.isSuccessful) {
-                                if (response.code() == 404) {
-                                    Log.d(TAG, "Loan already deleted from server (404)")
-                                } else {
-                                    val errorMsg = response.errorBody()?.string() ?: response.message()
-                                    Log.e(TAG, "Failed to delete from server: $errorMsg")
-                                    throw Exception("Gagal menghapus dari server: $errorMsg")
-                                }
-                            } else {
-                                Log.d(TAG, "Loan deleted from server: $sid")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error deleting from server", e)
-                        throw e
+                // Update deadline if provided
+                if (newDeadline != null) {
+                    loanDao.updateLoanDeadline(loanId, newDeadline, System.currentTimeMillis())
+                    
+                    // Reschedule loan alarms with new deadline
+                    val updatedLoan = loanDao.getLoanById(loanId)
+                    if (updatedLoan != null) {
+                        scheduleLoanAlarmsInternal(updatedLoan)
                     }
                 }
                 
-                // Delete from Room
-                loanDao.deleteLoanWithItems(loanId)
-                Log.d(TAG, "Loan deleted from Room: $loanId")
+                // Update items if provided
+                if (newItems != null) {
+                    // Delete existing items
+                    loanDao.deleteLoanItemsByLoanId(loanId)
+                    
+                    // Create new items
+                    val loanItems = newItems.map { item ->
+                        val actualInventarisId = if (item.inventarisId > 0) {
+                            item.inventarisId
+                        } else {
+                            val inventory = inventoryDao.getInventoryItemByCodeSync(item.kodeBarang)
+                            inventory?.serverId ?: 0
+                        }
+                        
+                        LoanItemEntity(
+                            loanId = loanId,
+                            inventarisId = if (actualInventarisId > 0) actualInventarisId else null,
+                            namaBarang = item.namaBarang,
+                            kodeBarang = item.kodeBarang,
+                            jumlah = item.jumlah,
+                            imageUri = item.imageUri
+                        )
+                    }
+                    
+                    loanDao.insertLoanItems(loanItems)
+                    
+                    // Mark loan as needing sync
+                    val updatedLoan = loan.copy(
+                        needsSync = true,
+                        lastModified = System.currentTimeMillis()
+                    )
+                    loanDao.updateLoan(updatedLoan)
+                }
+                
+                Log.d(TAG, "Loan updated locally: $loanId")
+                
+                // Try to sync to server if online
+                if (isOnline() && loan.serverId != null) {
+                    syncUpdatedLoanToServer(loanId, newDeadline, newItems)
+                }
+                
+                // Return updated loan
+                val updatedLoan = loanDao.getLoanById(loanId)
+                val items = loanDao.getLoanItems(loanId)
+                
+                Result.success(LoanWithItems(updatedLoan!!, items))
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating loan", e)
+                Result.failure(e)
+            }
+        }
+    }
+    
+    private suspend fun syncUpdatedLoanToServer(
+        loanId: String,
+        newDeadline: String?,
+        newItems: List<LoanItemInfo>?
+    ) {
+        try {
+            val loan = loanDao.getLoanById(loanId) ?: return
+            val serverId = loan.serverId ?: return
+            val authHeader = getAuthToken() ?: return
+            
+            // Convert deadline to API format
+            val apiDeadline = newDeadline?.let { convertDateFormat(it) }
+            
+            // Convert items to API format
+            val apiItems = newItems?.mapNotNull { item ->
+                val actualId = if (item.inventarisId > 0) item.inventarisId else {
+                    inventoryDao.getInventoryItemByCodeSync(item.kodeBarang)?.serverId
+                }
+                actualId?.let { LoanBarangRequest(it, item.jumlah) }
+            }
+            
+            val request = LoanUpdateRequest(
+                tanggalKembali = apiDeadline,
+                barangList = apiItems
+            )
+            
+            val response = apiService.updatePeminjaman(authHeader, serverId, request)
+            
+            if (response.isSuccessful && response.body()?.success == true) {
+                loanDao.markLoanAsSynced(loanId)
+                Log.d(TAG, "Loan update synced to server: $serverId")
+            } else {
+                Log.e(TAG, "Failed to sync loan update: ${response.errorBody()?.string()}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing loan update", e)
+        }
+    }
+    
+    private fun convertDateFormat(date: String): String {
+        return try {
+            val dateTimeFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+            val dateOnlyFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            val apiDateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+            val apiDateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            
+            if (date.contains(":")) {
+                val parsed = dateTimeFormat.parse(date)
+                parsed?.let { apiDateTimeFormat.format(it) } ?: date
+            } else {
+                val parsed = dateOnlyFormat.parse(date)
+                parsed?.let { apiDateFormat.format(it) } ?: date
+            }
+        } catch (e: Exception) {
+            date
+        }
+    }
+
+    /**
+     * Delete an active loan.
+     * If offline, soft deletes and syncs when online.
+     * If online, deletes from server and locally.
+     */
+    suspend fun deleteLoan(loanId: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val loan = loanDao.getLoanById(loanId)
+                    ?: return@withContext Result.failure(Exception("Loan not found"))
+                
+                // Cancel loan alarms
+                ReminderAlarmManager.cancelLoanAlarms(context, loanId)
+                
+                if (isOnline() && loan.serverId != null) {
+                    // Online: Delete from server first
+                    try {
+                        val authHeader = getAuthToken()
+                        if (authHeader != null) {
+                            val response = apiService.deletePeminjaman(authHeader, loan.serverId)
+                            if (!response.isSuccessful && response.code() != 404) {
+                                throw Exception("Failed to delete from server: ${response.message()}")
+                            }
+                            Log.d(TAG, "Loan deleted from server: ${loan.serverId}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error deleting from server", e)
+                        // Soft delete for sync later
+                        loanDao.softDeleteLoan(loanId, System.currentTimeMillis())
+                        return@withContext Result.success(Unit)
+                    }
+                    
+                    // Delete from Room
+                    loanDao.deleteLoanWithItems(loanId)
+                    Log.d(TAG, "Loan deleted from Room: $loanId")
+                } else if (loan.serverId != null) {
+                    // Offline but has server ID: Soft delete for sync later
+                    loanDao.softDeleteLoan(loanId, System.currentTimeMillis())
+                    Log.d(TAG, "Loan soft deleted (will sync later): $loanId")
+                } else {
+                    // Never synced to server: Just delete locally
+                    loanDao.deleteLoanWithItems(loanId)
+                    Log.d(TAG, "Local-only loan deleted: $loanId")
+                }
+                
                 Result.success(Unit)
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting loan", e)
                 Result.failure(e)
             }
+        }
+    }
+
+    // ==================== LOAN ALARM HELPERS ====================
+    
+    /**
+     * Schedule loan deadline alarms internally.
+     * Parses the tanggalKembali and schedules 3 alarms.
+     */
+    private fun scheduleLoanAlarmsInternal(loan: LoanEntity) {
+        try {
+            val dateTimeFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+            val dateOnlyFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            
+            val deadlineDate = try {
+                if (loan.tanggalKembali.contains(":")) {
+                    dateTimeFormat.parse(loan.tanggalKembali)
+                } else {
+                    // If no time specified, set to end of day (23:59)
+                    val date = dateOnlyFormat.parse(loan.tanggalKembali)
+                    java.util.Calendar.getInstance().apply {
+                        time = date ?: return
+                        set(java.util.Calendar.HOUR_OF_DAY, 23)
+                        set(java.util.Calendar.MINUTE, 59)
+                    }.time
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing loan deadline: ${loan.tanggalKembali}", e)
+                return
+            }
+            
+            if (deadlineDate == null) {
+                Log.e(TAG, "Failed to parse loan deadline")
+                return
+            }
+            
+            val deadlineTimeMillis = deadlineDate.time
+            
+            ReminderAlarmManager.scheduleLoanAlarms(
+                context = context,
+                loanId = loan.id,
+                loanServerId = loan.serverId,
+                borrowerName = loan.namaPeminjam,
+                deadlineTimeMillis = deadlineTimeMillis
+            )
+            
+            Log.d(TAG, "✓ Scheduled loan alarms for ${loan.namaPeminjam}, deadline: ${loan.tanggalKembali}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling loan alarms", e)
         }
     }
 
@@ -612,14 +814,36 @@ class LoanRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
-                val unsyncedLoans = loanDao.getUnsyncedLoans(userId)
                 var syncedCount = 0
+                
+                // First, sync deleted loans
+                val deletedLoans = loanDao.getDeletedLoansToSync(userId)
+                deletedLoans.forEach { loan ->
+                    try {
+                        val authHeader = getAuthToken()
+                        if (authHeader != null && loan.serverId != null) {
+                            val response = apiService.deletePeminjaman(authHeader, loan.serverId)
+                            if (response.isSuccessful || response.code() == 404) {
+                                // Actually delete from Room now
+                                loanDao.deleteLoanWithItems(loan.id)
+                                syncedCount++
+                                Log.d(TAG, "Synced deleted loan: ${loan.serverId}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error syncing deleted loan ${loan.id}", e)
+                    }
+                }
 
+                // Then sync unsynced (new/updated) loans
+                val unsyncedLoans = loanDao.getUnsyncedLoans(userId)
                 unsyncedLoans.forEach { loan ->
                     try {
-                        val items = loanDao.getLoanItems(loan.id)
-                        syncLoanToServer(loan, items)
-                        syncedCount++
+                        if (!loan.isDeleted) {
+                            val items = loanDao.getLoanItems(loan.id)
+                            syncLoanToServer(loan, items)
+                            syncedCount++
+                        }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error syncing loan ${loan.id}", e)
                     }
@@ -690,6 +914,11 @@ class LoanRepository(
                                 }
                                 
                                 loanDao.insertLoanItem(itemWithImages)
+                            }
+
+                            // Schedule alarms for active loans (Dipinjam)
+                            if (loan.status == "Dipinjam") {
+                                scheduleLoanAlarmsInternal(loan)
                             }
 
                             syncedCount++

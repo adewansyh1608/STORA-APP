@@ -264,7 +264,41 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun deleteLoanHistory(
+    fun updateLoan(
+        loanId: String,
+        newDeadline: String? = null,
+        newItems: List<LoanItemInfo>? = null,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val result = loanRepository.updateLoan(
+                    loanId = loanId,
+                    newDeadline = newDeadline,
+                    newItems = newItems
+                )
+                result.fold(
+                    onSuccess = {
+                        Log.d(TAG, "Loan updated successfully")
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Error updating loan", error)
+                        onError(error.message ?: "Unknown error")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception updating loan", e)
+                onError(e.message ?: "Unknown error")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun deleteLoan(
         loanId: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
@@ -272,19 +306,19 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val result = loanRepository.deleteLoanHistory(loanId)
+                val result = loanRepository.deleteLoan(loanId)
                 result.fold(
                     onSuccess = {
-                        Log.d(TAG, "Loan history deleted successfully")
+                        Log.d(TAG, "Loan deleted successfully")
                         onSuccess()
                     },
                     onFailure = { error ->
-                        Log.e(TAG, "Error deleting loan history", error)
+                        Log.e(TAG, "Error deleting loan", error)
                         onError(error.message ?: "Unknown error")
                     }
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Exception deleting loan history", e)
+                Log.e(TAG, "Exception deleting loan", e)
                 onError(e.message ?: "Unknown error")
             } finally {
                 _isLoading.value = false

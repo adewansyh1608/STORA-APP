@@ -21,9 +21,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +77,7 @@ fun DetailLoanScreen(
     var returnTime by remember { mutableStateOf(timeSdf.format(calendar.time)) }
     var showReturnDatePicker by remember { mutableStateOf(false) }
     var showReturnTimePicker by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     
     val loan = remember(loanId) {
         LoansData.loansOnLoan.find { it.id == loanId }
@@ -87,6 +91,32 @@ fun DetailLoanScreen(
     }
     
     val textGray = Color(0xFF585858)
+    
+    // Check if edit is allowed (only until 1 hour before deadline)
+    val isEditAllowed = remember(loan) {
+        loan?.let { l ->
+            try {
+                val deadline = l.returnDate
+                if (deadline != null) {
+                    val dateFormat = if (deadline.contains(":")) {
+                        java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                    } else {
+                        java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                    }
+                    val deadlineDate = dateFormat.parse(deadline)
+                    deadlineDate?.let {
+                        val oneHourBefore = java.util.Calendar.getInstance().apply {
+                            time = it
+                            add(java.util.Calendar.HOUR_OF_DAY, -1)
+                        }
+                        java.util.Date().before(oneHourBefore.time)
+                    } ?: false
+                } else false
+            } catch (e: Exception) {
+                false
+            }
+        } ?: false
+    }
     
     // Image picker launcher for return photo
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -155,6 +185,32 @@ fun DetailLoanScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
+                            tint = StoraWhite
+                        )
+                    }
+                },
+                actions = {
+                    // Edit button - only enabled until 1 hour before deadline
+                    IconButton(
+                        onClick = { 
+                            val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                            if (roomLoanId != null) {
+                                navController.navigate("edit_loan/$roomLoanId")
+                            }
+                        },
+                        enabled = isEditAllowed
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = "Edit",
+                            tint = if (isEditAllowed) StoraWhite else StoraWhite.copy(alpha = 0.5f)
+                        )
+                    }
+                    // Delete button
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Delete",
                             tint = StoraWhite
                         )
                     }
@@ -662,6 +718,72 @@ fun DetailLoanScreen(
                 }
             )
         }
+    }
+    
+    // Delete Confirmation Dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = Color(0xFFE53935)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Hapus Peminjaman?")
+                }
+            },
+            text = {
+                Text("Peminjaman ini akan dihapus. Tindakan ini tidak dapat dibatalkan.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                        if (roomLoanId != null) {
+                            loanViewModel.deleteLoan(
+                                loanId = roomLoanId,
+                                onSuccess = {
+                                    showDeleteDialog = false
+                                    navController.popBackStack(Routes.LOANS_SCREEN, false)
+                                },
+                                onError = { error ->
+                                    showDeleteDialog = false
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error: $error",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = StoraWhite,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Hapus", color = StoraWhite)
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDeleteDialog = false },
+                    border = BorderStroke(1.dp, Color.Gray)
+                ) {
+                    Text("Batal", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 
