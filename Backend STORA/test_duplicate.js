@@ -1,6 +1,5 @@
 const http = require('http');
 
-// Login first
 const loginData = JSON.stringify({
     email: "d.andreanms@gmail.com",
     password: "Andrean29"
