@@ -264,6 +264,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 description = "Notifikasi pengingat pengecekan inventory"
                 enableVibration(true)
                 enableLights(true)
+                // Enable default notification sound
+                setSound(
+                    android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -291,6 +299,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVibrate(longArrayOf(0, 500, 200, 500))
+            .setDefaults(NotificationCompat.DEFAULT_SOUND) // Add default sound
             .build()
 
         // Show notification with unique ID based on current time

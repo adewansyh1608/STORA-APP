@@ -320,7 +320,7 @@ class PeminjamanController {
   async updatePeminjamanStatus(req, res) {
     try {
       const { id } = req.params;
-      const { Status, Tanggal_Dikembalikan } = req.body;
+      const { Status, Tanggal_Dikembalikan, Tanggal_Kembali } = req.body;
 
       // Build where clause including user ownership check
       const whereClause = {
@@ -335,6 +335,9 @@ class PeminjamanController {
       const updateData = { Status };
       if (Tanggal_Dikembalikan) {
         updateData.Tanggal_Dikembalikan = Tanggal_Dikembalikan;
+      }
+      if (Tanggal_Kembali) {
+        updateData.Tanggal_Kembali = Tanggal_Kembali;
       }
 
       const [updatedRowsCount] = await Peminjaman.update(

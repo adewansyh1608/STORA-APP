@@ -16,6 +16,7 @@ object Routes {
     const val LOAN_FORM_SCREEN = "loan_form/{selectedItems}"
     const val DETAIL_LOAN_SCREEN = "detail_loan/{loanId}"
     const val DETAIL_LOAN_HISTORY_SCREEN = "detail_loan_history/{loanId}"
+    const val EDIT_LOAN_SCREEN = "edit_loan/{loanId}"
     const val PROFILE_SCREEN = "profile"
     const val EDIT_PROFILE_SCREEN = "edit_profile"
     const val SETTING_SCREEN = "setting"

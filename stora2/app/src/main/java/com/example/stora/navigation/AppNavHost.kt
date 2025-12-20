@@ -25,6 +25,7 @@ import com.example.stora.screens.NewLoanScreen
 import com.example.stora.screens.LoanFormScreen
 import com.example.stora.screens.DetailLoanScreen
 import com.example.stora.screens.DetailLoanHistoryScreen
+import com.example.stora.screens.EditLoanScreen
 import com.example.stora.screens.ProfileScreen
 import com.example.stora.screens.EditProfileScreen
 import com.example.stora.screens.SettingScreen
@@ -318,6 +319,31 @@ fun AppNavHost(
         ) { backStackEntry ->
             val loanId = backStackEntry.arguments?.getInt("loanId") ?: 0
             DetailLoanHistoryScreen(
+                navController = navController,
+                loanId = loanId
+            )
+        }
+
+        composable(
+            route = Routes.EDIT_LOAN_SCREEN,
+            arguments = listOf(
+                navArgument("loanId") { type = NavType.IntType }
+            ),
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(500)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(500)
+                )
+            }
+        ) { backStackEntry ->
+            val loanId = backStackEntry.arguments?.getInt("loanId") ?: 0
+            EditLoanScreen(
                 navController = navController,
                 loanId = loanId
             )
