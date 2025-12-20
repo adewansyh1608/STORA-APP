@@ -153,12 +153,23 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
 
                 val result = repository.saveReminder(reminder)
                 if (result.isSuccess) {
+                    val savedReminder = result.getOrNull() ?: reminder
                     Log.d(TAG, "Custom reminder saved successfully")
 
-                    // Schedule specific notification for this reminder
+                    // Schedule AlarmManager for exact alarm (works when app is closed)
+                    com.example.stora.notification.ReminderAlarmManager.scheduleExactAlarm(
+                        context = getApplication(),
+                        reminderId = savedReminder.id,
+                        reminderTitle = savedReminder.title ?: "Pengingat",
+                        reminderType = "custom",
+                        serverReminderId = savedReminder.serverId,
+                        scheduledTimeMillis = scheduledDatetime
+                    )
+
+                    // Also schedule WorkManager as backup
                     ReminderScheduler.scheduleCustomReminder(
                         getApplication(),
-                        reminder.id,
+                        savedReminder.id,
                         scheduledDatetime
                     )
 
@@ -184,6 +195,8 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val result = repository.deleteReminder(id)
                 if (result.isSuccess) {
+                    // Cancel both AlarmManager and WorkManager
+                    com.example.stora.notification.ReminderAlarmManager.cancelAlarm(getApplication(), id)
                     ReminderScheduler.cancelCustomReminder(getApplication(), id)
                     onSuccess()
                 } else {

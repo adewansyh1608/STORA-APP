@@ -367,6 +367,117 @@ class PeminjamanController {
     }
   }
 
+  // Update peminjaman (deadline and items)
+  async updatePeminjaman(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id } = req.params;
+      const { Tanggal_Kembali, barangList } = req.body;
+
+      console.log('=== UPDATE PEMINJAMAN ===');
+      console.log('ID:', id);
+      console.log('New deadline:', Tanggal_Kembali);
+      console.log('New items:', barangList);
+
+      // Build where clause including user ownership check
+      const whereClause = {
+        ID_Peminjaman: id
+      };
+
+      // Only allow update of user's own loans
+      if (req.user && req.user.id) {
+        whereClause.ID_User = req.user.id;
+      }
+
+      const peminjaman = await Peminjaman.findOne({
+        where: whereClause,
+        include: [{
+          association: 'barang'
+        }]
+      });
+
+      if (!peminjaman) {
+        await transaction.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'Peminjaman not found or you do not have permission to update it'
+        });
+      }
+
+      // Only allow editing active loans
+      if (peminjaman.Status !== 'Dipinjam') {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Only active loans can be edited'
+        });
+      }
+
+      // Update deadline if provided
+      if (Tanggal_Kembali) {
+        await peminjaman.update({ Tanggal_Kembali }, { transaction });
+      }
+
+      // Update items if provided
+      if (barangList && Array.isArray(barangList)) {
+        // Delete existing items
+        await PeminjamanBarang.destroy({
+          where: { ID_Peminjaman: id },
+          transaction
+        });
+
+        // Create new items
+        const peminjamanBarangData = barangList.map(item => ({
+          ID_Peminjaman: parseInt(id),
+          ID_Inventaris: item.ID_Inventaris,
+          Jumlah: item.Jumlah
+        }));
+
+        await PeminjamanBarang.bulkCreate(peminjamanBarangData, {
+          transaction,
+          returning: true
+        });
+      }
+
+      await transaction.commit();
+
+      // Fetch updated peminjaman
+      const updatedPeminjaman = await Peminjaman.findByPk(id, {
+        include: [
+          {
+            association: 'barang',
+            include: [
+              {
+                association: 'inventaris',
+                attributes: ['Nama_Barang', 'Kode_Barang']
+              },
+              {
+                association: 'foto',
+                attributes: ['ID_Foto_Peminjaman', 'Foto_Peminjaman', 'Foto_Pengembalian']
+              }
+            ]
+          }
+        ]
+      });
+
+      console.log('✓ Peminjaman updated successfully');
+
+      res.status(200).json({
+        success: true,
+        message: 'Peminjaman updated successfully',
+        data: updatedPeminjaman
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error('✗ Error updating peminjaman:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
   // Get peminjaman statistics
   async getPeminjamanStats(req, res) {
     try {

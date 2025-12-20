@@ -349,18 +349,67 @@ class NotificationController {
     async createNotificationHistory(req, res) {
         try {
             const userId = req.user.id;
-            const { Judul, Pesan, Tanggal, Status } = req.body;
+            const { Judul, Pesan, Tanggal, Status, ID_Reminder, timestamp } = req.body;
+
+            // Handle timestamp - can be milliseconds timestamp or date string
+            let parsedDate;
+            if (timestamp) {
+                // If timestamp (milliseconds) is provided, use it
+                const numericValue = parseInt(timestamp, 10);
+                if (!isNaN(numericValue) && numericValue > 1000000000000) {
+                    parsedDate = new Date(numericValue);
+                } else if (!isNaN(numericValue) && numericValue > 1000000000) {
+                    parsedDate = new Date(numericValue * 1000);
+                } else {
+                    parsedDate = new Date(timestamp);
+                }
+            } else if (Tanggal) {
+                parsedDate = new Date(Tanggal);
+            } else {
+                parsedDate = new Date();
+            }
+
+            console.log(`Creating notification: Judul=${Judul}, timestamp=${timestamp}, parsedDate=${parsedDate.toISOString()}`);
+
+            // Check for existing notification with same reminder on same day (deduplication)
+            if (ID_Reminder) {
+                const startOfDay = new Date(parsedDate);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(parsedDate);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const existingNotification = await Notifikasi.findOne({
+                    where: {
+                        ID_User: userId,
+                        ID_Reminder: ID_Reminder,
+                        Tanggal: {
+                            [require('sequelize').Op.between]: [startOfDay, endOfDay]
+                        }
+                    }
+                });
+
+                if (existingNotification) {
+                    console.log(`✓ Duplicate notification found for reminder ${ID_Reminder}, returning existing`);
+                    return res.status(200).json({
+                        success: true,
+                        message: 'Notification already exists',
+                        data: existingNotification,
+                        isDuplicate: true,
+                    });
+                }
+            }
 
             const notification = await Notifikasi.create({
                 ID_User: userId,
                 Judul: Judul || 'Notifikasi',
                 Pesan: Pesan || '',
-                Tanggal: Tanggal || new Date().toISOString().split('T')[0],
-                Status: Status || 'sent',
+                Tanggal: parsedDate, // Now stores full datetime
+                Status: 'Terkirim', // Standardized status
+                ID_Reminder: ID_Reminder || null,
                 isSynced: true,
             });
 
-            console.log(`✓ Notification history created for user ${userId}: ${Judul}`);
+            console.log(`✓ Notification history created for user ${userId}: ${Judul} at ${parsedDate.toISOString()}`);
 
             res.status(201).json({
                 success: true,

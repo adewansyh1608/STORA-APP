@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,7 +46,6 @@ fun DetailLoanHistoryScreen(
     loanViewModel: LoanViewModel = viewModel()
 ) {
     var isVisible by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
@@ -400,169 +398,6 @@ fun DetailLoanHistoryScreen(
                         }
                         
                         Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-            }
-        }
-    }
-    
-    // Modern Delete Confirmation Dialog
-    if (showDeleteDialog) {
-        Dialog(onDismissRequest = { showDeleteDialog = false }) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = StoraWhite
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Icon
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(40.dp))
-                            .background(Color(0xFFFFEBEE)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Delete",
-                            tint = Color(0xFFE53935),
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(20.dp))
-                    
-                    // Title
-                    Text(
-                        text = "Hapus History?",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StoraBlueDark
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    // Description
-                    Text(
-                        text = "History peminjaman ini akan dihapus secara permanen dan tidak dapat dikembalikan.",
-                        fontSize = 14.sp,
-                        color = textGray,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 20.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(28.dp))
-                    
-                    // Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Cancel Button
-                        OutlinedButton(
-                            onClick = { showDeleteDialog = false },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFE0E0E0)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = textGray
-                            )
-                        ) {
-                            Text(
-                                text = "Batal",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        
-                        // Delete Button
-                        Button(
-                            onClick = {
-                                // Get the Room loan ID from the first item
-                                val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
-                                
-                                if (roomLoanId != null) {
-                                    // Use ViewModel to delete from both server and Room
-                                    loanViewModel.deleteLoanHistory(
-                                        loanId = roomLoanId,
-                                        onSuccess = {
-                                            // Also remove from in-memory LoansData
-                                            loanGroup.forEach { item ->
-                                                LoansData.deleteLoanHistory(item.id)
-                                            }
-                                            showDeleteDialog = false
-                                            
-                                            // Set result for previous screen to show snackbar
-                                            navController.previousBackStackEntry
-                                                ?.savedStateHandle
-                                                ?.set("history_deleted", true)
-                                            
-                                            // Navigate back
-                                            navController.popBackStack()
-                                        },
-                                        onError = { error ->
-                                            showDeleteDialog = false
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    message = "Error: $error",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                            }
-                                        }
-                                    )
-                                } else {
-                                    // Fallback: only delete from in-memory LoansData
-                                    loanGroup.forEach { item ->
-                                        LoansData.deleteLoanHistory(item.id)
-                                    }
-                                    showDeleteDialog = false
-                                    
-                                    // Set result for previous screen to show snackbar
-                                    navController.previousBackStackEntry
-                                        ?.savedStateHandle
-                                        ?.set("history_deleted", true)
-                                    
-                                    // Navigate back
-                                    navController.popBackStack()
-                                }
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFE53935)
-                            ),
-                            enabled = !isLoading
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = StoraWhite,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Text(
-                                    text = "Hapus",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StoraWhite
-                                )
-                            }
-                        }
                     }
                 }
             }

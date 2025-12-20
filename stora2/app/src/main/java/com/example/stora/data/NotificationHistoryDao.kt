@@ -66,6 +66,138 @@ interface NotificationHistoryDao {
     @Query("SELECT * FROM notification_history WHERE userId = :userId AND serverId IS NOT NULL")
     suspend fun getSyncedNotificationsWithServerId(userId: Int): List<NotificationHistoryEntity>
     
+    // ============ Deduplication Queries ============
+    
+    /**
+     * Check if notification already exists for a specific reminder on a specific date
+     * Used to prevent duplicate notifications when switching between offline/online
+     */
+    @Query("""
+        SELECT * FROM notification_history 
+        WHERE userId = :userId 
+        AND relatedReminderId = :reminderId 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        LIMIT 1
+    """)
+    suspend fun getNotificationByReminderAndDate(
+        userId: Int, 
+        reminderId: String, 
+        startOfDay: Long, 
+        endOfDay: Long
+    ): NotificationHistoryEntity?
+    
+    /**
+     * Check if notification already exists by title, message, and date
+     * Used for loan notification deduplication
+     */
+    @Query("""
+        SELECT * FROM notification_history 
+        WHERE userId = :userId 
+        AND title = :title 
+        AND message = :message 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        LIMIT 1
+    """)
+    suspend fun getNotificationByTitleMessageAndDate(
+        userId: Int, 
+        title: String,
+        message: String,
+        startOfDay: Long, 
+        endOfDay: Long
+    ): NotificationHistoryEntity?
+    
+    /**
+     * Check if notification exists by server reminder ID on a specific date
+     */
+    @Query("""
+        SELECT * FROM notification_history 
+        WHERE userId = :userId 
+        AND serverReminderId = :serverReminderId 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        LIMIT 1
+    """)
+    suspend fun getNotificationByServerReminderAndDate(
+        userId: Int, 
+        serverReminderId: Int, 
+        startOfDay: Long, 
+        endOfDay: Long
+    ): NotificationHistoryEntity?
+    
+    /**
+     * Delete local (offline) notification for a specific reminder on a specific date
+     * Used when online notification arrives and we want to replace the offline one
+     */
+    @Query("""
+        DELETE FROM notification_history 
+        WHERE userId = :userId 
+        AND relatedReminderId = :reminderId 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        AND isLocallyCreated = 1
+    """)
+    suspend fun deleteLocalNotificationForReminder(
+        userId: Int, 
+        reminderId: String, 
+        startOfDay: Long, 
+        endOfDay: Long
+    )
+    
+    /**
+     * Delete local (offline) notification by server reminder ID on a specific date
+     * Used when syncing and server notification has ID_Reminder
+     */
+    @Query("""
+        DELETE FROM notification_history 
+        WHERE userId = :userId 
+        AND serverReminderId = :serverReminderId 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        AND isLocallyCreated = 1
+    """)
+    suspend fun deleteLocalNotificationByServerReminderId(
+        userId: Int, 
+        serverReminderId: Int, 
+        startOfDay: Long, 
+        endOfDay: Long
+    )
+    
+    /**
+     * Delete ALL local (offline) notifications by server reminder ID
+     * Used when syncing - no timestamp restriction to ensure cleanup
+     */
+    @Query("""
+        DELETE FROM notification_history 
+        WHERE userId = :userId 
+        AND serverReminderId = :serverReminderId 
+        AND isLocallyCreated = 1
+    """)
+    suspend fun deleteAllLocalNotificationsByServerReminderId(
+        userId: Int, 
+        serverReminderId: Int
+    )
+    
+    /**
+     * Delete local (offline) notification by title and date
+     * Used as fallback when serverReminderId doesn't match (offline created reminder got new ID after sync)
+     */
+    @Query("""
+        DELETE FROM notification_history 
+        WHERE userId = :userId 
+        AND title = :title 
+        AND timestamp >= :startOfDay 
+        AND timestamp < :endOfDay 
+        AND isLocallyCreated = 1
+    """)
+    suspend fun deleteLocalNotificationByTitleAndDate(
+        userId: Int, 
+        title: String,
+        startOfDay: Long, 
+        endOfDay: Long
+    )
+    
     // ============ Insert/Update Methods ============
     
     /**

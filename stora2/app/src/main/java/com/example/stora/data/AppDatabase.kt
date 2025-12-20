@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         ReminderEntity::class,
         NotificationHistoryEntity::class
     ],
-    version = 5,
+    version = 7, // Incremented for isDeleted field in LoanEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

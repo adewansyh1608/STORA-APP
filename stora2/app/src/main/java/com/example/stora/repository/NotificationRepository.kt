@@ -244,12 +244,15 @@ class NotificationRepository(
     
     /**
      * Record a local notification (when notification fires offline)
+     * Includes deduplication check to prevent duplicate notifications
      */
     suspend fun recordLocalNotification(
         title: String,
         message: String,
+        timestamp: Long = System.currentTimeMillis(),
         relatedLoanId: Int? = null,
-        relatedReminderId: String? = null
+        relatedReminderId: String? = null,
+        serverReminderId: Int? = null
     ): Result<NotificationHistoryEntity> {
         return withContext(Dispatchers.IO) {
             try {
@@ -258,16 +261,41 @@ class NotificationRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
                 
+                // Check for existing notification (deduplication)
+                if (relatedReminderId != null) {
+                    val calendar = java.util.Calendar.getInstance()
+                    calendar.timeInMillis = timestamp
+                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    calendar.set(java.util.Calendar.MINUTE, 0)
+                    calendar.set(java.util.Calendar.SECOND, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val startOfDay = calendar.timeInMillis
+                    
+                    calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                    val endOfDay = calendar.timeInMillis
+                    
+                    val existing = historyDao.getNotificationByReminderAndDate(
+                        userId, relatedReminderId, startOfDay, endOfDay
+                    )
+                    
+                    if (existing != null) {
+                        Log.d(TAG, "⏭ Notification already exists for reminder $relatedReminderId, skipping")
+                        return@withContext Result.success(existing)
+                    }
+                }
+                
                 val notification = NotificationHistoryEntity.createLocal(
                     userId = userId,
                     title = title,
                     message = message,
+                    timestamp = timestamp,
                     relatedLoanId = relatedLoanId,
-                    relatedReminderId = relatedReminderId
+                    relatedReminderId = relatedReminderId,
+                    serverReminderId = serverReminderId
                 )
                 
                 historyDao.insertNotification(notification)
-                Log.d(TAG, "✓ Local notification recorded: $title")
+                Log.d(TAG, "✓ Local notification recorded: $title at ${java.util.Date(timestamp)}")
                 Result.success(notification)
             } catch (e: Exception) {
                 Log.e(TAG, "Error recording notification", e)
@@ -387,21 +415,38 @@ class NotificationRepository(
                 val unsyncedNotifications = historyDao.getUnsyncedNotifications(userId)
                 unsyncedNotifications.forEach { notification ->
                     try {
-                        // Create notification on server
+                        // Create notification on server with full timestamp and ID_Reminder
+                        val requestBody = mutableMapOf<String, Any>(
+                            "Judul" to notification.title,
+                            "Pesan" to notification.message,
+                            "timestamp" to notification.timestamp.toString(),
+                            "Status" to notification.status
+                        )
+                        
+                        // Add ID_Reminder if available
+                        val reminderId = notification.serverReminderId 
+                            ?: notification.relatedReminderId?.toIntOrNull()
+                        if (reminderId != null) {
+                            requestBody["ID_Reminder"] = reminderId
+                        }
+                        
                         val response = apiService.createNotificationHistory(
                             authHeader,
-                            mapOf(
-                                "Judul" to notification.title,
-                                "Pesan" to notification.message,
-                                "Tanggal" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                                    .format(java.util.Date(notification.timestamp)),
-                                "Status" to notification.status
-                            )
+                            requestBody
                         )
                         
                         if (response.isSuccessful && response.body()?.success == true) {
                             val serverData = response.body()?.data
-                            if (serverData != null) {
+                            // Check if it was a duplicate
+                            val isDuplicate = response.body()?.let { body ->
+                                // Check if response contains isDuplicate flag
+                                try {
+                                    val json = org.json.JSONObject(response.raw().toString())
+                                    json.optBoolean("isDuplicate", false)
+                                } catch (e: Exception) { false }
+                            } ?: false
+                            
+                            if (serverData != null && !isDuplicate) {
                                 historyDao.updateServerId(notification.id, serverData.idNotifikasi)
                             } else {
                                 historyDao.markAsSynced(notification.id)
@@ -500,10 +545,46 @@ class NotificationRepository(
                     if (historyResponse.isSuccessful && historyResponse.body()?.success == true) {
                         val serverHistory = historyResponse.body()?.data ?: emptyList()
                         
+                        // First pass: collect all server notification reminder IDs
+                        val serverReminderIds = serverHistory.mapNotNull { it.idReminder }.toSet()
+                        Log.d(TAG, "Server has notifications for reminder IDs: $serverReminderIds")
+                        
+                        // Delete all local (offline) notifications that have matching serverReminderId
+                        serverReminderIds.forEach { reminderId ->
+                            historyDao.deleteAllLocalNotificationsByServerReminderId(userId, reminderId)
+                            Log.d(TAG, "🗑 Deleted all local notifications for serverReminderId=$reminderId")
+                        }
+                        
+                        // Second pass: insert server notifications and delete duplicates by title+timestamp
                         serverHistory.forEach { serverNotification ->
-                            val existingLocal = historyDao.getNotificationByServerId(serverNotification.idNotifikasi)
+                            val existingByServerId = historyDao.getNotificationByServerId(serverNotification.idNotifikasi)
                             
-                            if (existingLocal == null) {
+                            if (existingByServerId == null) {
+                                // IMPORTANT: Also delete by title and timestamp to handle mismatched reminder IDs
+                                // This happens when reminder is created offline and gets new ID after sync
+                                val title = serverNotification.judul
+                                if (!title.isNullOrEmpty()) {
+                                    // Calculate today's timestamp range
+                                    val calendar = java.util.Calendar.getInstance()
+                                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                    calendar.set(java.util.Calendar.MINUTE, 0)
+                                    calendar.set(java.util.Calendar.SECOND, 0)
+                                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                                    val startOfDay = calendar.timeInMillis
+                                    calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                                    val endOfDay = calendar.timeInMillis
+                                    
+                                    // Delete local notification with same title on same day
+                                    historyDao.deleteLocalNotificationByTitleAndDate(
+                                        userId,
+                                        title,
+                                        startOfDay,
+                                        endOfDay
+                                    )
+                                    Log.d(TAG, "🗑 Deleted local notification by title='$title'")
+                                }
+                                
+                                // Insert server version
                                 val historyEntity = NotificationHistoryEntity.fromApiModel(
                                     serverNotification,
                                     null,
@@ -511,6 +592,7 @@ class NotificationRepository(
                                 )
                                 historyDao.insertNotification(historyEntity)
                                 syncedCount++
+                                Log.d(TAG, "✓ Synced notification from server: ${serverNotification.judul}")
                             }
                         }
                     }

@@ -16,6 +16,9 @@ data class NotificationHistoryEntity(
     /** Server ID (null if created locally/offline and not yet synced) */
     val serverId: Int? = null,
     
+    /** Server Reminder ID for deduplication (maps to ID_Reminder in backend) */
+    val serverReminderId: Int? = null,
+    
     /** User ID who received this notification */
     val userId: Int,
     
@@ -28,13 +31,13 @@ data class NotificationHistoryEntity(
     /** When the notification was sent (timestamp in milliseconds) */
     val timestamp: Long = System.currentTimeMillis(),
     
-    /** Status: "sent", "read", "pending" */
-    val status: String = "sent",
+    /** Status: "Terkirim", "read", "pending" - standardized to Indonesian */
+    val status: String = "Terkirim",
     
     /** Related loan ID if this is a loan reminder notification */
     val relatedLoanId: Int? = null,
     
-    /** Related reminder ID if this was triggered by a reminder */
+    /** Related reminder ID (local Room ID) if this was triggered by a reminder */
     val relatedReminderId: String? = null,
     
     /** Whether this notification was created locally (offline) */
@@ -56,25 +59,19 @@ data class NotificationHistoryEntity(
         fun fromApiModel(apiModel: NotificationHistoryApiModel, localId: String? = null, userId: Int): NotificationHistoryEntity {
             val timestamp = apiModel.tanggal?.let {
                 try {
-                    // Try datetime format first (with time)
-                    val dateTimeFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                    dateTimeFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                    dateTimeFormat.parse(it)?.time
-                        ?: try {
-                            // Try alternative format without milliseconds
-                            val altFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-                            altFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                            altFormat.parse(it)?.time
-                        } catch (e: Exception) {
+                    // Try parsing as ISO datetime first (e.g., "2025-12-20T03:59:00.000Z")
+                    val isoFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                    isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    isoFormat.parse(it.replace(".000Z", ""))?.time
+                        ?: run {
                             // Fallback to date-only format
                             java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
+                                ?: System.currentTimeMillis()
                         }
-                        ?: System.currentTimeMillis()
                 } catch (e: Exception) {
-                    // Fallback to date-only format
+                    // Try timestamp format
                     try {
-                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
-                            ?: System.currentTimeMillis()
+                        it.toLongOrNull() ?: System.currentTimeMillis()
                     } catch (e2: Exception) {
                         System.currentTimeMillis()
                     }
@@ -84,11 +81,15 @@ data class NotificationHistoryEntity(
             return NotificationHistoryEntity(
                 id = localId ?: UUID.randomUUID().toString(),
                 serverId = apiModel.idNotifikasi,
+                serverReminderId = apiModel.idReminder,
                 userId = userId,
                 title = apiModel.judul ?: "Notifikasi",
                 message = apiModel.pesan ?: "",
                 timestamp = timestamp,
-                status = apiModel.status ?: "sent",
+                status = apiModel.status?.let { 
+                    // Standardize status to "Terkirim"
+                    if (it.equals("sent", ignoreCase = true)) "Terkirim" else it 
+                } ?: "Terkirim",
                 relatedLoanId = apiModel.idPeminjaman,
                 isLocallyCreated = false,
                 needsSync = false,
@@ -104,17 +105,20 @@ data class NotificationHistoryEntity(
             userId: Int,
             title: String,
             message: String,
+            timestamp: Long = System.currentTimeMillis(),
             relatedLoanId: Int? = null,
-            relatedReminderId: String? = null
+            relatedReminderId: String? = null,
+            serverReminderId: Int? = null
         ): NotificationHistoryEntity {
             return NotificationHistoryEntity(
                 id = UUID.randomUUID().toString(),
                 serverId = null,
+                serverReminderId = serverReminderId,
                 userId = userId,
                 title = title,
                 message = message,
-                timestamp = System.currentTimeMillis(),
-                status = "sent",
+                timestamp = timestamp,
+                status = "Terkirim", // Standardized status
                 relatedLoanId = relatedLoanId,
                 relatedReminderId = relatedReminderId,
                 isLocallyCreated = true,

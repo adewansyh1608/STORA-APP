@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +82,7 @@ fun DetailLoanScreen(
     var returnTime by remember { mutableStateOf(timeSdf.format(calendar.time)) }
     var showReturnDatePicker by remember { mutableStateOf(false) }
     var showReturnTimePicker by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     
     val loan = remember(loanId) {
         LoansData.loansOnLoan.find { it.id == loanId }
@@ -95,73 +97,30 @@ fun DetailLoanScreen(
     
     val textGray = Color(0xFF585858)
     
-    // Delete Dialog state
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    
-    // Check if deadline is within 1 hour - disable edit/delete buttons
-    // Using loan.returnDate as the deadline (tanggalKembali from Room)
-    val isDeadlineWithinOneHour by remember(loan) {
-        derivedStateOf {
-            loan?.returnDate?.let { returnDateStr ->
-                try {
-                    android.util.Log.d("DetailLoanScreen", "Loan returnDate value: '$returnDateStr'")
-                    
-                    // Try multiple date formats
-                    val formats = listOf(
-                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()),
-                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()),
-                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()),
-                        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                    )
-                    
-                    var deadlineDate: java.util.Date? = null
-                    for (format in formats) {
-                        try {
-                            deadlineDate = format.parse(returnDateStr)
-                            if (deadlineDate != null) {
-                                android.util.Log.d("DetailLoanScreen", "Parsed with format: ${format.toPattern()}")
-                                break
-                            }
-                        } catch (e: Exception) {
-                            // Try next format
-                        }
-                    }
-                    
-                    // If parsed with date-only format, set to end of day
-                    if (deadlineDate != null && !returnDateStr.contains(":")) {
-                        val cal = Calendar.getInstance()
-                        cal.time = deadlineDate
-                        cal.set(Calendar.HOUR_OF_DAY, 23)
-                        cal.set(Calendar.MINUTE, 59)
-                        cal.set(Calendar.SECOND, 59)
-                        deadlineDate = cal.time
-                    }
-                    
-                    if (deadlineDate != null) {
-                        val currentTime = System.currentTimeMillis()
-                        val deadlineTime = deadlineDate.time
-                        val oneHourInMillis = 60 * 60 * 1000L
-                        val timeDiff = deadlineTime - currentTime
-                        
-                        android.util.Log.d("DetailLoanScreen", "Deadline: $deadlineTime, Current: $currentTime, Diff: ${timeDiff/1000}s, OneHour: ${oneHourInMillis/1000}s")
-                        
-                        // Return true if deadline is within 1 hour or already passed
-                        val result = timeDiff <= oneHourInMillis
-                        android.util.Log.d("DetailLoanScreen", "isDeadlineWithinOneHour: $result")
-                        result
+    // Check if edit is allowed (only until 1 hour before deadline)
+    val isEditAllowed = remember(loan) {
+        loan?.let { l ->
+            try {
+                val deadline = l.returnDate
+                if (deadline != null) {
+                    val dateFormat = if (deadline.contains(":")) {
+                        java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                     } else {
-                        android.util.Log.d("DetailLoanScreen", "Could not parse deadline date: $returnDateStr")
-                        false
+                        java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("DetailLoanScreen", "Error checking deadline", e)
-                    false
-                }
-            } ?: run {
-                android.util.Log.d("DetailLoanScreen", "loan.returnDate is null")
+                    val deadlineDate = dateFormat.parse(deadline)
+                    deadlineDate?.let {
+                        val oneHourBefore = java.util.Calendar.getInstance().apply {
+                            time = it
+                            add(java.util.Calendar.HOUR_OF_DAY, -1)
+                        }
+                        java.util.Date().before(oneHourBefore.time)
+                    } ?: false
+                } else false
+            } catch (e: Exception) {
                 false
             }
-        }
+        } ?: false
     }
     
     // Image picker launcher for return photo
@@ -236,27 +195,28 @@ fun DetailLoanScreen(
                     }
                 },
                 actions = {
-                    // Edit button - disabled if within 1 hour of deadline
+                    // Edit button - only enabled until 1 hour before deadline
                     IconButton(
-                        onClick = { navController.navigate(Routes.editLoanScreen(loanId)) },
-                        enabled = !isDeadlineWithinOneHour
+                        onClick = { 
+                            val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                            if (roomLoanId != null) {
+                                navController.navigate("edit_loan/$roomLoanId")
+                            }
+                        },
+                        enabled = isEditAllowed
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
                             contentDescription = "Edit",
-                            tint = if (isDeadlineWithinOneHour) Color.Gray else StoraWhite
+                            tint = if (isEditAllowed) StoraWhite else StoraWhite.copy(alpha = 0.5f)
                         )
                     }
-                    
-                    // Delete button - disabled if within 1 hour of deadline
-                    IconButton(
-                        onClick = { showDeleteDialog = true },
-                        enabled = !isDeadlineWithinOneHour
-                    ) {
+                    // Delete button
+                    IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = "Delete",
-                            tint = if (isDeadlineWithinOneHour) Color.Gray else StoraWhite
+                            tint = StoraWhite
                         )
                     }
                 },
@@ -763,139 +723,74 @@ fun DetailLoanScreen(
                 }
             )
         }
-        
-        // Delete Confirmation Dialog
-        if (showDeleteDialog) {
-            Dialog(onDismissRequest = { showDeleteDialog = false }) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = StoraWhite),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Icon
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(40.dp))
-                                .background(Color(0xFFFFEBEE)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = "Delete",
-                                tint = Color(0xFFE53935),
-                                modifier = Modifier.size(40.dp)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        Text(
-                            text = "Hapus Peminjaman?",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StoraBlueDark
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Text(
-                            text = "Peminjaman ini akan dihapus secara permanen dan tidak dapat dikembalikan.",
-                            fontSize = 14.sp,
-                            color = textGray,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-                        
-                        Spacer(modifier = Modifier.height(28.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { showDeleteDialog = false },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.5.dp, Color(0xFFE0E0E0)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = textGray)
-                            ) {
-                                Text(
-                                    text = "Batal",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            
-                            Button(
-                                onClick = {
-                                    val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
-                                    if (roomLoanId != null) {
-                                        loanViewModel.deleteLoan(
-                                            loanId = roomLoanId,
-                                            onSuccess = {
-                                                loanGroup.forEach { item ->
-                                                    LoansData.loansOnLoan.removeAll { it.id == item.id }
-                                                }
-                                                showDeleteDialog = false
-                                                navController.popBackStack()
-                                            },
-                                            onError = { error ->
-                                                showDeleteDialog = false
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        message = "Error: $error",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                }
-                                            }
+    }
+    
+    // Delete Confirmation Dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = Color(0xFFE53935)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Hapus Peminjaman?")
+                }
+            },
+            text = {
+                Text("Peminjaman ini akan dihapus. Tindakan ini tidak dapat dibatalkan.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val roomLoanId = loanGroup.firstOrNull()?.roomLoanId
+                        if (roomLoanId != null) {
+                            loanViewModel.deleteLoan(
+                                loanId = roomLoanId,
+                                onSuccess = {
+                                    showDeleteDialog = false
+                                    navController.popBackStack(Routes.LOANS_SCREEN, false)
+                                },
+                                onError = { error ->
+                                    showDeleteDialog = false
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error: $error",
+                                            duration = SnackbarDuration.Short
                                         )
                                     }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
-                                enabled = !isLoading
-                            ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = StoraWhite,
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Text(
-                                        text = "Hapus",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = StoraWhite
-                                    )
                                 }
-                            }
+                            )
                         }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = StoraWhite,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Hapus", color = StoraWhite)
                     }
                 }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDeleteDialog = false },
+                    border = BorderStroke(1.dp, Color.Gray)
+                ) {
+                    Text("Batal", color = Color.Gray)
+                }
             }
-        }
+        )
     }
 }
-
-
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

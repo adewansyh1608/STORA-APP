@@ -180,27 +180,35 @@ class ReminderScheduler {
             console.log(`Found ${customReminders.length} custom reminders due`);
 
             for (const reminder of customReminders) {
+                const reminderTitle = reminder.title || 'Pengingat Pengecekan Inventory';
+                // Standardized message format to match offline notification
+                const reminderMessage = `Waktu pengingat: ${reminderTitle}`;
+
                 console.log(`Sending custom reminder ${reminder.ID_Reminder}, scheduled for ${reminder.scheduled_datetime}`);
 
                 // Send to ALL user devices (multi-device support)
                 const result = await this.sendToAllUserDevices(
                     reminder.ID_User,
-                    reminder.title || 'Pengingat Pengecekan Inventory',
-                    'Cek Inventory Anda',
+                    reminderTitle,
+                    reminderMessage,
                     {
                         type: 'custom_reminder',
                         reminder_id: reminder.ID_Reminder.toString(),
+                        reminder_timestamp: reminder.scheduled_datetime ?
+                            new Date(reminder.scheduled_datetime).getTime().toString() :
+                            now.getTime().toString(),
                     }
                 );
 
                 if (result.success || result.successCount > 0) {
-                    // Save notification history to database
+                    // Save notification history to database with ID_Reminder for deduplication
                     await Notifikasi.create({
-                        Judul: reminder.title || 'Pengingat Pengecekan Inventory',
-                        Pesan: 'Cek Inventory Anda',
-                        Tanggal: now,
+                        Judul: reminderTitle,
+                        Pesan: reminderMessage,
+                        Tanggal: reminder.scheduled_datetime || now, // Full datetime
                         Status: 'Terkirim',
                         ID_User: reminder.ID_User,
+                        ID_Reminder: reminder.ID_Reminder, // Added for deduplication
                         isSynced: true,
                     });
                     console.log(`✓ Notification history saved for custom reminder ${reminder.ID_Reminder}`);
@@ -223,6 +231,7 @@ class ReminderScheduler {
     }
 
     // Check loan return deadlines and send notifications
+    // Sends 3 notifications: 1 hour before, at deadline, and 1 hour after
     async checkLoanDeadlines(now) {
         try {
             // Get all active loans (status = 'Dipinjam')
@@ -240,53 +249,49 @@ class ReminderScheduler {
 
             console.log(`📋 Found ${activeLoans.length} active loans to check for deadlines`);
 
-            const today = new Date(now);
-            today.setHours(0, 0, 0, 0);
-
-            const currentHour = now.getHours();
-            const currentMinute = now.getMinutes();
-
-            console.log(`⏰ Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
+            const currentTime = now.getTime();
 
             for (const loan of activeLoans) {
                 const hasFcmToken = loan.user && loan.user.FCM_Token;
-                console.log(`  Loan ${loan.ID_Peminjaman}: ${loan.Nama_Peminjam}, deadline: ${loan.Tanggal_Kembali}, FCM: ${hasFcmToken ? 'YES' : 'NO'}`);
 
                 if (!hasFcmToken) {
-                    console.log(`  ⚠ Skipping loan ${loan.ID_Peminjaman} - no FCM token`);
                     continue;
                 }
 
+                // Parse deadline datetime
                 const deadlineDate = new Date(loan.Tanggal_Kembali);
-                const deadlineDateOnly = new Date(deadlineDate);
-                deadlineDateOnly.setHours(0, 0, 0, 0);
+                const deadlineTime = deadlineDate.getTime();
 
-                const deadlineHour = deadlineDate.getHours();
-                const deadlineMinute = deadlineDate.getMinutes();
+                // Calculate the 3 notification times
+                const oneHourBefore = deadlineTime - (60 * 60 * 1000); // 1 hour before
+                const atDeadline = deadlineTime;
+                const oneHourAfter = deadlineTime + (60 * 60 * 1000); // 1 hour after
 
-                // Check if today is the deadline day
-                const isDeadlineDay = today.getTime() === deadlineDateOnly.getTime();
-                console.log(`  📅 Deadline: ${deadlineHour}:${deadlineMinute.toString().padStart(2, '0')}, isDeadlineDay: ${isDeadlineDay}`);
+                // Get current minute boundary (for checking within 1 minute window)
+                const nowMinute = Math.floor(currentTime / 60000) * 60000;
+                const oneMinuteWindow = 60000; // 1 minute window
 
-                if (isDeadlineDay) {
-                    const currentTotalMinutes = currentHour * 60 + currentMinute;
-                    const deadlineTotalMinutes = deadlineHour * 60 + deadlineMinute;
+                console.log(`  Loan ${loan.ID_Peminjaman}: ${loan.Nama_Peminjam}, deadline: ${deadlineDate.toISOString()}`);
 
-                    // Check for reminder 1 hour before deadline
-                    const oneHourBeforeDeadline = deadlineTotalMinutes - 60;
-                    if (currentTotalMinutes === oneHourBeforeDeadline && oneHourBeforeDeadline >= 0) {
-                        await this.sendPreDeadlineReminder(loan, now, deadlineHour, deadlineMinute);
-                    }
+                // Check 1 hour BEFORE deadline
+                if (nowMinute >= oneHourBefore && nowMinute < oneHourBefore + oneMinuteWindow) {
+                    await this.sendLoanNotification(loan, now, 'warning',
+                        `Peminjaman "${loan.Nama_Peminjam}" akan deadline dalam 1 jam`,
+                        'loan_deadline_warning');
+                }
 
-                    // Check for exact deadline time reminder
-                    if (currentTotalMinutes === deadlineTotalMinutes) {
-                        await this.sendDeadlineReminder(loan, now, deadlineHour, deadlineMinute);
-                    }
+                // Check AT deadline
+                if (nowMinute >= atDeadline && nowMinute < atDeadline + oneMinuteWindow) {
+                    await this.sendLoanNotification(loan, now, 'deadline',
+                        `Peminjaman "${loan.Nama_Peminjam}" sudah mencapai batas waktu pengembalian`,
+                        'loan_deadline');
+                }
 
-                    // Check for overdue reminder (past deadline, only once)
-                    if (currentTotalMinutes > deadlineTotalMinutes) {
-                        await this.sendOverdueReminder(loan, now, deadlineHour, deadlineMinute);
-                    }
+                // Check 1 hour AFTER deadline
+                if (nowMinute >= oneHourAfter && nowMinute < oneHourAfter + oneMinuteWindow) {
+                    await this.sendLoanNotification(loan, now, 'overdue',
+                        `Peminjaman "${loan.Nama_Peminjam}" sudah terlambat 1 jam dari deadline`,
+                        'loan_overdue');
                 }
             }
         } catch (error) {
@@ -294,7 +299,72 @@ class ReminderScheduler {
         }
     }
 
-    async sendPreDeadlineReminder(loan, now, deadlineHour, deadlineMinute) {
+    /**
+     * Send loan notification with deduplication
+     * @param {object} loan - Loan object
+     * @param {Date} now - Current time
+     * @param {string} notifType - Notification type (warning, deadline, overdue)
+     * @param {string} message - Notification message
+     * @param {string} fcmType - FCM data type
+     */
+    async sendLoanNotification(loan, now, notifType, message, fcmType) {
+        try {
+            // Create a unique identifier for deduplication
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+
+            // Check if notification already sent
+            const existingNotif = await Notifikasi.findOne({
+                where: {
+                    ID_User: loan.ID_User,
+                    ID_Peminjaman: loan.ID_Peminjaman,
+                    Pesan: message,
+                    Tanggal: { [Op.gte]: todayStart }
+                }
+            });
+
+            if (existingNotif) {
+                console.log(`  ℹ ${notifType} notification already sent for loan ${loan.ID_Peminjaman}`);
+                return;
+            }
+
+            console.log(`  📤 Sending ${notifType} notification for loan ${loan.ID_Peminjaman}...`);
+
+            // Send to ALL user devices (multi-device support)
+            const result = await this.sendToAllUserDevices(
+                loan.ID_User,
+                'Pengingat Peminjaman',
+                message,
+                {
+                    type: fcmType,
+                    loan_id: loan.ID_Peminjaman.toString(),
+                    borrower_name: loan.Nama_Peminjam,
+                    loan_timestamp: new Date(loan.Tanggal_Kembali).getTime().toString()
+                }
+            );
+
+            // Save notification to database
+            await Notifikasi.create({
+                Judul: 'Pengingat Peminjaman',
+                Pesan: message,
+                Tanggal: now,
+                Status: (result.success || result.successCount > 0) ? 'Terkirim' : 'Gagal',
+                ID_User: loan.ID_User,
+                ID_Peminjaman: loan.ID_Peminjaman,
+                isSynced: true
+            });
+
+            if (result.success || result.successCount > 0) {
+                console.log(`  ✓ ${notifType} notification sent for loan ${loan.ID_Peminjaman}`);
+            } else {
+                console.log(`  ⚠ ${notifType} notification saved but FCM failed for loan ${loan.ID_Peminjaman}`);
+            }
+        } catch (error) {
+            console.error(`  ❌ Error sending ${notifType} notification for loan ${loan.ID_Peminjaman}:`, error);
+        }
+    }
+
+    async sendMorningReminder(loan, now) {
         try {
             // Check if we already sent the pre-deadline reminder today
             const todayStart = new Date(now);

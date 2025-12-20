@@ -21,14 +21,24 @@ const Notifikasi = sequelize.define(
       field: 'Pesan',
     },
     Tanggal: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATE, // Changed from DATEONLY to DATE to include time
       allowNull: true,
       field: 'Tanggal',
     },
     Status: {
       type: DataTypes.STRING(50),
       allowNull: true,
+      defaultValue: 'Terkirim', // Standardize default status
       field: 'Status',
+    },
+    ID_Reminder: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'ID_Reminder',
+      references: {
+        model: 'reminder_settings',
+        key: 'ID_Reminder',
+      },
     },
     ID_User: {
       type: DataTypes.INTEGER,

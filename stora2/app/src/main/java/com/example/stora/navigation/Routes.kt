@@ -27,5 +27,7 @@ object Routes {
     fun loanFormScreen(selectedItems: String) = "loan_form/$selectedItems"
     fun detailLoanScreen(loanId: Int) = "detail_loan/$loanId"
     fun detailLoanHistoryScreen(loanId: Int) = "detail_loan_history/$loanId"
-    fun editLoanScreen(loanId: Int) = "edit_loan/$loanId"
+    
+    const val EDIT_LOAN_SCREEN = "edit_loan/{loanId}"
+    fun editLoanScreen(loanId: String) = "edit_loan/$loanId"
 }
