@@ -42,7 +42,7 @@ import java.util.*
 @Composable
 fun DetailLoanHistoryScreen(
     navController: NavHostController,
-    loanId: Int,
+    loanId: String,
     loanViewModel: LoanViewModel = viewModel()
 ) {
     var isVisible by remember { mutableStateOf(false) }
@@ -50,43 +50,47 @@ fun DetailLoanHistoryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
     
-    val loan = remember(loanId) {
-        LoansData.loansHistory.find { it.id == loanId }
+    // Load loan data from Room
+    var loanWithItems by remember { mutableStateOf<com.example.stora.data.LoanWithItems?>(null) }
+    
+    LaunchedEffect(loanId) {
+        if (loanId.isNotEmpty()) {
+            loanWithItems = loanViewModel.getLoanById(loanId)
+        }
     }
     
-    // Get all items with the same groupId
-    val loanGroup = remember(loanId) {
-        loan?.let { firstLoan ->
-            LoansData.loansHistory.filter { it.groupId == firstLoan.groupId }
-        } ?: emptyList()
-    }
+    // Derive data from Room loanWithItems
+    val loan = loanWithItems?.loan
+    val loanItems = loanWithItems?.items ?: emptyList()
     
     val textGray = Color(0xFF585858)
     
     // Calculate return status based on actual return date vs deadline
     val returnStatus = remember(loan) {
-        if (loan?.borrowDate != null && loan.returnDate != null && loan?.actualReturnDate != null) {
-            try {
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                val returnDateDeadline = sdf.parse(loan.returnDate) // Deadline (tanggal pengembalian yang dijanjikan)
-                val actualReturnDate = sdf.parse(loan.actualReturnDate) // Actual return date (tanggal benar-benar dikembalikan)
-                
-                if (returnDateDeadline != null && actualReturnDate != null) {
-                    // Check if returned after deadline
-                    if (actualReturnDate.after(returnDateDeadline)) {
-                        "Telat" to Color(0xFFE53935) // Red
+        loan?.let { l ->
+            if (l.tanggalDikembalikan != null) {
+                try {
+                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                    val returnDateDeadline = sdf.parse(l.tanggalKembali) // Deadline
+                    val actualReturnDate = sdf.parse(l.tanggalDikembalikan) // Actual return date
+                    
+                    if (returnDateDeadline != null && actualReturnDate != null) {
+                        // Check if returned after deadline
+                        if (actualReturnDate.after(returnDateDeadline)) {
+                            "Telat" to Color(0xFFE53935) // Red
+                        } else {
+                            "Tepat Waktu" to Color(0xFF4CAF50) // Green
+                        }
                     } else {
-                        "Tepat Waktu" to Color(0xFF4CAF50) // Green
+                        "Tepat Waktu" to Color(0xFF4CAF50)
                     }
-                } else {
+                } catch (e: Exception) {
                     "Tepat Waktu" to Color(0xFF4CAF50)
                 }
-            } catch (e: Exception) {
+            } else {
                 "Tepat Waktu" to Color(0xFF4CAF50)
             }
-        } else {
-            "Tepat Waktu" to Color(0xFF4CAF50)
-        }
+        } ?: ("Tepat Waktu" to Color(0xFF4CAF50))
     }
     
     LaunchedEffect(Unit) {
@@ -157,7 +161,7 @@ fun DetailLoanHistoryScreen(
                     ) {
                         // Borrower Name at the top
                         Text(
-                            text = loan.borrower ?: "-",
+                            text = loan.namaPeminjam,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = StoraBlueDark
@@ -166,9 +170,9 @@ fun DetailLoanHistoryScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         
                         // Phone Number
-                        if (!loan.borrowerPhone.isNullOrEmpty()) {
+                        if (loan.noHpPeminjam.isNotEmpty()) {
                             Text(
-                                text = loan.borrowerPhone,
+                                text = loan.noHpPeminjam,
                                 fontSize = 14.sp,
                                 color = textGray,
                                 fontWeight = FontWeight.Medium
@@ -191,7 +195,7 @@ fun DetailLoanHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = loan.borrowDate ?: "-",
+                                    text = loan.tanggalPinjam,
                                     fontSize = 13.sp,
                                     color = StoraBlueDark,
                                     fontWeight = FontWeight.SemiBold
@@ -207,7 +211,7 @@ fun DetailLoanHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = loan.returnDate ?: "-",
+                                    text = loan.tanggalKembali,
                                     fontSize = 13.sp,
                                     color = StoraBlueDark,
                                     fontWeight = FontWeight.SemiBold
@@ -255,7 +259,7 @@ fun DetailLoanHistoryScreen(
                         
                         // Items Details Section
                         Text(
-                            text = "Detail Barang (${loanGroup.size})",
+                            text = "Detail Barang (${loanItems.size})",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = StoraBlueDark
@@ -264,7 +268,7 @@ fun DetailLoanHistoryScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         // Display all items in the group
-                        loanGroup.forEach { item ->
+                        loanItems.forEach { item ->
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -280,7 +284,7 @@ fun DetailLoanHistoryScreen(
                                 ) {
                                     // Item Name
                                     Text(
-                                        text = item.name,
+                                        text = item.namaBarang,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = StoraBlueDark
@@ -301,7 +305,7 @@ fun DetailLoanHistoryScreen(
                                                 fontWeight = FontWeight.Medium
                                             )
                                             Text(
-                                                text = item.code,
+                                                text = item.kodeBarang,
                                                 fontSize = 12.sp,
                                                 color = StoraBlueDark,
                                                 fontWeight = FontWeight.SemiBold
@@ -316,7 +320,7 @@ fun DetailLoanHistoryScreen(
                                                 fontWeight = FontWeight.Medium
                                             )
                                             Text(
-                                                text = "${item.quantity}",
+                                                text = "${item.jumlah}",
                                                 fontSize = 12.sp,
                                                 color = StoraBlueDark,
                                                 fontWeight = FontWeight.SemiBold

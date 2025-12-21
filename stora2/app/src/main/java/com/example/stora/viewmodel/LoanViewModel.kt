@@ -57,11 +57,51 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         loadLoanHistory()
         updateUnsyncedCount()
         
-        // Sync from server on initialization if online
+        // Start periodic server availability check
+        startPeriodicServerCheck()
+        
+        // Initial sync from server if online
         if (isOnline()) {
             checkServerAndSync()
         } else {
             _isServerAvailable.value = false
+        }
+    }
+    
+    // Periodic server availability check
+    private fun startPeriodicServerCheck() {
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10000) // Check every 10 seconds
+                checkServerAvailability()
+            }
+        }
+    }
+    
+    // Public function to check server availability
+    fun checkServerAvailability() {
+        viewModelScope.launch {
+            val wasOnline = isOnline()
+            val wasServerAvailable = _isServerAvailable.value
+            
+            if (wasOnline) {
+                try {
+                    // Try a lightweight API call to check if server is reachable
+                    val result = loanRepository.checkServerHealth()
+                    _isServerAvailable.value = result
+                    
+                    // If we just came back online, trigger a sync
+                    if (result && !wasServerAvailable) {
+                        Log.d(TAG, "Server is back online, triggering sync")
+                        syncFromServer()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Server health check failed: ${e.message}")
+                    _isServerAvailable.value = false
+                }
+            } else {
+                _isServerAvailable.value = false
+            }
         }
     }
 
@@ -163,6 +203,10 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
                         _syncStatus.value = "Sinkronisasi berhasil: $toServer ke server, $fromServer dari server"
                         _isServerAvailable.value = true
                         Log.d(TAG, "Sync completed: $toServer to server, $fromServer from server")
+                        
+                        // Reload data from Room to update in-memory LoansData cache
+                        loadActiveLoans()
+                        loadLoanHistory()
                     },
                     onFailure = { error ->
                         _syncStatus.value = "Gagal sinkronisasi: ${error.message}"
@@ -326,68 +370,6 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Delete active loan
-    fun deleteLoan(
-        loanId: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val result = loanRepository.deleteLoan(loanId)
-                result.fold(
-                    onSuccess = {
-                        Log.d(TAG, "Loan deleted successfully")
-                        onSuccess()
-                    },
-                    onFailure = { error ->
-                        Log.e(TAG, "Error deleting loan", error)
-                        onError(error.message ?: "Unknown error")
-                    }
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception deleting loan", e)
-                onError(e.message ?: "Unknown error")
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    // Update loan deadline and item quantities
-    fun updateLoan(
-        loanId: String,
-        newDeadline: String,
-        itemQuantities: Map<String, Int>,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val result = loanRepository.updateLoan(loanId, newDeadline, itemQuantities)
-                result.fold(
-                    onSuccess = {
-                        Log.d(TAG, "Loan updated successfully")
-                        // Refresh data to reflect changes
-                        loadActiveLoans()
-                        onSuccess()
-                    },
-                    onFailure = { error ->
-                        Log.e(TAG, "Error updating loan", error)
-                        onError(error.message ?: "Unknown error")
-                    }
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception updating loan", e)
-                onError(e.message ?: "Unknown error")
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
     suspend fun getLoanById(loanId: String): LoanWithItems? {
         return loanRepository.getLoanById(loanId)
     }
@@ -447,6 +429,10 @@ class LoanViewModel(application: Application) : AndroidViewModel(application) {
                     onSuccess = { (toServer, fromServer) ->
                         _syncStatus.value = "Sinkronisasi berhasil: $toServer ke server, $fromServer dari server"
                         updateUnsyncedCount()
+                        
+                        // Reload data from Room to update in-memory LoansData cache
+                        loadActiveLoans()
+                        loadLoanHistory()
                     },
                     onFailure = { error ->
                         _syncStatus.value = "Gagal sinkronisasi: ${error.message}"

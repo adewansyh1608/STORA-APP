@@ -277,7 +277,7 @@ fun AppNavHost(
         composable(
             route = Routes.DETAIL_LOAN_SCREEN,
             arguments = listOf(
-                navArgument("loanId") { type = NavType.IntType }
+                navArgument("loanId") { type = NavType.StringType }
             ),
             enterTransition = {
                 slideIntoContainer(
@@ -292,7 +292,7 @@ fun AppNavHost(
                 )
             }
         ) { backStackEntry ->
-            val loanId = backStackEntry.arguments?.getInt("loanId") ?: 0
+            val loanId = backStackEntry.arguments?.getString("loanId") ?: ""
             DetailLoanScreen(
                 navController = navController,
                 loanId = loanId
@@ -302,7 +302,7 @@ fun AppNavHost(
         composable(
             route = Routes.DETAIL_LOAN_HISTORY_SCREEN,
             arguments = listOf(
-                navArgument("loanId") { type = NavType.IntType }
+                navArgument("loanId") { type = NavType.StringType }
             ),
             enterTransition = {
                 slideIntoContainer(
@@ -317,33 +317,8 @@ fun AppNavHost(
                 )
             }
         ) { backStackEntry ->
-            val loanId = backStackEntry.arguments?.getInt("loanId") ?: 0
+            val loanId = backStackEntry.arguments?.getString("loanId") ?: ""
             DetailLoanHistoryScreen(
-                navController = navController,
-                loanId = loanId
-            )
-        }
-
-        composable(
-            route = Routes.EDIT_LOAN_SCREEN,
-            arguments = listOf(
-                navArgument("loanId") { type = NavType.IntType }
-            ),
-            enterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(500)
-                )
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(500)
-                )
-            }
-        ) { backStackEntry ->
-            val loanId = backStackEntry.arguments?.getInt("loanId") ?: 0
-            EditLoanScreen(
                 navController = navController,
                 loanId = loanId
             )

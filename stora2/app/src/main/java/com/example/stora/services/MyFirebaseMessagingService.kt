@@ -63,7 +63,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     
     /**
      * Handle loan notification with deduplication check.
-     * If offline notification already shown for this loan type, skip showing again.
+     * If offline notification already shown for this loan type, replace it with online version.
      */
     private fun handleLoanNotification(
         title: String,
@@ -104,15 +104,30 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 if (existingNotification != null) {
                     Log.d(TAG, "⏭ Loan notification already exists (offline was shown)")
                     
-                    // If existing notification was local (offline), update it to mark as synced
+                    // If existing notification was local (offline), delete it and insert online version
                     if (existingNotification.isLocallyCreated) {
-                        val updated = existingNotification.copy(
-                            needsSync = false,
+                        // Delete the offline version
+                        database.notificationHistoryDao().deleteNotification(existingNotification.id)
+                        Log.d(TAG, "🗑 Deleted offline loan notification: ${existingNotification.id}")
+                        
+                        // Insert new online version (not locally created, already synced)
+                        val onlineNotification = NotificationHistoryEntity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            title = title,
+                            message = body,
+                            timestamp = timestamp,
+                            status = "Terkirim",
+                            userId = userId,
+                            serverId = null,
+                            relatedReminderId = loanId,
+                            serverReminderId = loanId?.toIntOrNull(),
+                            isLocallyCreated = false, // Came from FCM - online
                             isSynced = true,
+                            needsSync = false,
                             lastModified = System.currentTimeMillis()
                         )
-                        database.notificationHistoryDao().updateNotification(updated)
-                        Log.d(TAG, "✓ Offline loan notification marked as synced")
+                        database.notificationHistoryDao().insertNotification(onlineNotification)
+                        Log.d(TAG, "✓ Replaced offline with online loan notification")
                     }
                     
                     // DO NOT show notification again - offline version was already shown
@@ -153,7 +168,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     
     /**
      * Handle reminder notification with deduplication check.
-     * If offline notification already shown for this reminder, skip showing again.
+     * If offline notification already shown for this reminder, replace it with online version.
      */
     private fun handleReminderNotification(
         title: String, 
@@ -193,15 +208,30 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 if (existingNotification != null) {
                     Log.d(TAG, "⏭ Notification already exists for reminder $reminderId (offline notification was shown)")
                     
-                    // If existing notification was local (offline), update it to mark as synced
+                    // If existing notification was local (offline), delete it and insert online version
                     if (existingNotification.isLocallyCreated) {
-                        val updated = existingNotification.copy(
-                            needsSync = false,
+                        // Delete the offline version
+                        database.notificationHistoryDao().deleteNotification(existingNotification.id)
+                        Log.d(TAG, "🗑 Deleted offline reminder notification: ${existingNotification.id}")
+                        
+                        // Insert new online version (not locally created, already synced)
+                        val onlineNotification = NotificationHistoryEntity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            title = title,
+                            message = body,
+                            timestamp = timestamp,
+                            status = "Terkirim",
+                            userId = userId,
+                            serverId = null,
+                            relatedReminderId = reminderId,
+                            serverReminderId = reminderId.toIntOrNull(),
+                            isLocallyCreated = false, // Came from FCM - online
                             isSynced = true,
+                            needsSync = false,
                             lastModified = System.currentTimeMillis()
                         )
-                        database.notificationHistoryDao().updateNotification(updated)
-                        Log.d(TAG, "✓ Offline notification marked as synced")
+                        database.notificationHistoryDao().insertNotification(onlineNotification)
+                        Log.d(TAG, "✓ Replaced offline with online reminder notification")
                     }
                     
                     // DO NOT show notification again - offline version was already shown
@@ -216,17 +246,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 
                 // Save to Room database
                 val serverReminderId = reminderId.toIntOrNull()
-                val notification = NotificationHistoryEntity.createLocal(
-                    userId = userId,
+                val notification = NotificationHistoryEntity(
+                    id = java.util.UUID.randomUUID().toString(),
                     title = title,
                     message = body,
                     timestamp = timestamp,
+                    status = "Terkirim",
+                    userId = userId,
+                    serverId = null,
                     relatedReminderId = reminderId,
-                    serverReminderId = serverReminderId
-                ).copy(
+                    serverReminderId = serverReminderId,
                     isLocallyCreated = false, // Not locally created - came from server
                     needsSync = false,
-                    isSynced = true
+                    isSynced = true,
+                    lastModified = System.currentTimeMillis()
                 )
                 
                 database.notificationHistoryDao().insertNotification(notification)

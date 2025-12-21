@@ -40,6 +40,24 @@ class LoanRepository(
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
+    
+    // Check if server is reachable (lightweight health check)
+    suspend fun checkServerHealth(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (!isOnline()) return@withContext false
+                
+                val authHeader = getAuthToken() ?: return@withContext false
+                
+                // Try a lightweight API call - get stats
+                val response = apiService.getPeminjamanStats(authHeader)
+                response.isSuccessful
+            } catch (e: Exception) {
+                Log.d(TAG, "Server health check failed: ${e.message}")
+                false
+            }
+        }
+    }
 
     // Get count of unsynced loans
     suspend fun getUnsyncedLoansCount(): Int {
@@ -877,6 +895,30 @@ class LoanRepository(
                 if (response.isSuccessful && response.body()?.success == true) {
                     val serverLoans = response.body()?.data ?: emptyList()
                     var syncedCount = 0
+                    var deletedCount = 0
+
+                    // Get all server loan IDs
+                    val serverLoanIds = serverLoans.mapNotNull { it.idPeminjaman }.toSet()
+                    Log.d(TAG, "Server has ${serverLoanIds.size} loans")
+
+                    // Get local synced loans (have serverId)
+                    val localSyncedLoans = loanDao.getSyncedLoansWithServerId(userId)
+                    Log.d(TAG, "Local has ${localSyncedLoans.size} synced loans")
+
+                    // Delete local loans that no longer exist on server (and don't have pending local changes)
+                    localSyncedLoans.filter { it.serverId !in serverLoanIds && !it.needsSync }.forEach { localLoan ->
+                        try {
+                            // Cancel any scheduled alarms
+                            ReminderAlarmManager.cancelLoanAlarms(context, localLoan.id)
+                            // Delete from Room
+                            loanDao.deleteLoanWithItems(localLoan.id)
+                            deletedCount++
+                            Log.d(TAG, "✓ Deleted local loan (removed from server): ${localLoan.id}, serverId: ${localLoan.serverId}")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error deleting local loan ${localLoan.id}", e)
+                        }
+                    }
+                    Log.d(TAG, "Deleted $deletedCount loans that were removed from server")
 
                     serverLoans.forEach { apiModel ->
                         try {

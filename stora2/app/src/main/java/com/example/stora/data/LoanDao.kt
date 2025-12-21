@@ -23,6 +23,10 @@ interface LoanDao {
     @Query("SELECT * FROM loans WHERE serverId = :serverId")
     suspend fun getLoanByServerId(serverId: Int): LoanEntity?
 
+    // Get loans that are synced (have serverId) for cleanup during sync
+    @Query("SELECT * FROM loans WHERE userId = :userId AND serverId IS NOT NULL AND isDeleted = 0")
+    suspend fun getSyncedLoansWithServerId(userId: Int): List<LoanEntity>
+
     @Query("SELECT * FROM loans WHERE userId = :userId AND needsSync = 1")
     suspend fun getUnsyncedLoans(userId: Int): List<LoanEntity>
 

@@ -50,7 +50,8 @@ data class GroupedLoanItem(
     val status: String?,
     val totalQuantity: Int,
     val items: List<LoanItem>,
-    val firstItemId: Int
+    val firstItemId: Int,
+    val roomLoanId: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,7 +152,8 @@ fun LoansScreen(
                     status = items.firstOrNull()?.status,
                     totalQuantity = items.sumOf { it.quantity },
                     items = items,
-                    firstItemId = items.firstOrNull()?.id ?: -1
+                    firstItemId = items.firstOrNull()?.id ?: -1,
+                    roomLoanId = items.firstOrNull()?.roomLoanId
                 )
             }
     }
@@ -218,10 +220,10 @@ fun LoansScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Sync button with badge
-                if (unsyncedCount > 0) {
-                    BadgedBox(
-                        badge = {
+                // Sync button - ALWAYS visible with different states
+                BadgedBox(
+                    badge = {
+                        if (unsyncedCount > 0) {
                             Badge(
                                 containerColor = Color.Red,
                                 contentColor = StoraWhite
@@ -232,40 +234,43 @@ fun LoansScreen(
                                 )
                             }
                         }
-                    ) {
-                        FloatingActionButton(
-                            onClick = { loanViewModel.syncData() },
-                            containerColor = if (isActuallyOnline) StoraYellow else Color.Gray,
-                            contentColor = StoraWhite,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            if (isSyncing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = StoraWhite,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = if (isActuallyOnline) Icons.Filled.Sync else Icons.Filled.CloudOff,
-                                    contentDescription = "Sync",
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
                     }
-                } else if (isActuallyOnline) {
+                ) {
                     FloatingActionButton(
-                        onClick = { loanViewModel.syncData() },
-                        containerColor = Color(0xFF4CAF50),
+                        onClick = { 
+                            if (isActuallyOnline || unsyncedCount > 0) {
+                                loanViewModel.syncData() 
+                            }
+                        },
+                        containerColor = when {
+                            isActuallyOnline && unsyncedCount == 0 -> Color(0xFF4CAF50) // Green - synced
+                            isActuallyOnline && unsyncedCount > 0 -> StoraYellow // Yellow - needs sync
+                            else -> Color.Gray // Gray - offline
+                        },
                         contentColor = StoraWhite,
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.CloudDone,
-                            contentDescription = "Synced",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = StoraWhite,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = when {
+                                    !isActuallyOnline -> Icons.Filled.CloudOff
+                                    unsyncedCount > 0 -> Icons.Filled.Sync
+                                    else -> Icons.Filled.CloudDone
+                                },
+                                contentDescription = when {
+                                    !isActuallyOnline -> "Offline"
+                                    unsyncedCount > 0 -> "Sync"
+                                    else -> "Synced"
+                                },
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
 
@@ -425,11 +430,13 @@ fun LoansScreen(
                             enter = fadeIn(animationSpec = tween(500)) + slideInVertically(initialOffsetY = { it / 2 })
                         ) {
                             LoanGroupCard(groupedItem = groupedItem, isHistory = selectedTab == 1) {
-                                // Navigate to detail screen with firstItemId to show all items in group
-                                if (selectedTab == 1) {
-                                    navController.navigate(Routes.detailLoanHistoryScreen(groupedItem.firstItemId))
-                                } else {
-                                    navController.navigate(Routes.detailLoanScreen(groupedItem.firstItemId))
+                                // Navigate to detail screen with roomLoanId to load from Room
+                                groupedItem.roomLoanId?.let { roomId ->
+                                    if (selectedTab == 1) {
+                                        navController.navigate(Routes.detailLoanHistoryScreen(roomId))
+                                    } else {
+                                        navController.navigate(Routes.detailLoanScreen(roomId))
+                                    }
                                 }
                             }
                         }

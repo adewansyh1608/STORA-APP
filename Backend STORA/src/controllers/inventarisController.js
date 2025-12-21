@@ -371,35 +371,89 @@ class InventarisController {
 
 
   async deleteInventaris(req, res) {
+    const transaction = await sequelize.transaction();
     try {
       const { id } = req.params;
-
+      const fs = require('fs');
+      const path = require('path');
 
       const whereClause = {
         ID_Inventaris: id
       };
 
-
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
 
-      const deletedRowsCount = await Inventaris.destroy({
+      // First, check if the inventory item exists
+      const inventaris = await Inventaris.findOne({
         where: whereClause,
+        include: [{
+          association: 'foto',
+          attributes: ['ID_Foto_Inventaris', 'Foto']
+        }],
+        transaction
       });
 
-      if (deletedRowsCount === 0) {
+      if (!inventaris) {
+        await transaction.rollback();
         return res.status(404).json({
           success: false,
           message: 'Inventaris not found or you do not have permission to delete it',
         });
       }
 
+      console.log(`===== DELETE INVENTARIS REQUEST (ID: ${id}) =====`);
+      console.log(`Found ${inventaris.foto ? inventaris.foto.length : 0} related photos`);
+
+      // Delete physical photo files from disk
+      if (inventaris.foto && inventaris.foto.length > 0) {
+        for (const foto of inventaris.foto) {
+          if (foto.Foto) {
+            // Construct the file path (remove leading slash if present)
+            const relativePath = foto.Foto.startsWith('/') ? foto.Foto.substring(1) : foto.Foto;
+            const filePath = path.join(__dirname, '../../', relativePath);
+            
+            try {
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log(`✓ Deleted photo file: ${filePath}`);
+              } else {
+                console.log(`Photo file not found (may have been deleted already): ${filePath}`);
+              }
+            } catch (fileError) {
+              console.error(`✗ Error deleting photo file ${filePath}:`, fileError.message);
+              // Continue even if file deletion fails
+            }
+          }
+        }
+      }
+
+      // Delete related photos from FotoInventaris table
+      const deletedPhotosCount = await FotoInventaris.destroy({
+        where: { ID_Inventaris: id },
+        transaction
+      });
+      console.log(`✓ Deleted ${deletedPhotosCount} photos from database`);
+
+      // Now delete the inventory item
+      await Inventaris.destroy({
+        where: whereClause,
+        transaction
+      });
+      console.log(`✓ Deleted inventaris ID: ${id}`);
+      console.log('=================================================');
+
+      await transaction.commit();
+
       res.status(200).json({
         success: true,
-        message: 'Inventaris deleted successfully',
+        message: 'Inventaris and related photos deleted successfully',
+        deletedPhotos: deletedPhotosCount
       });
     } catch (error) {
+      await transaction.rollback();
+      console.error('✗ Error deleting inventaris:', error);
       res.status(500).json({
         success: false,
         message: error.message,

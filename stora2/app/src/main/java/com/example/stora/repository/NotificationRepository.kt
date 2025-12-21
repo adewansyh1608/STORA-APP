@@ -532,6 +532,35 @@ class NotificationRepository(
                             )
                             reminderDao.insertReminder(reminderEntity)
                             Log.d(TAG, "✓ Synced reminder from server: ${reminderEntity.title}, scheduledDatetime=${reminderEntity.scheduledDatetime}")
+                            
+                            // Schedule AlarmManager and WorkManager for custom reminders
+                            // This ensures notifications work on ALL devices, not just the creating device
+                            if (reminderEntity.reminderType == "custom" && 
+                                reminderEntity.isActive && 
+                                !reminderEntity.isDeleted) {
+                                val scheduledTime = reminderEntity.scheduledDatetime
+                                if (scheduledTime != null && scheduledTime > System.currentTimeMillis()) {
+                                    // Schedule AlarmManager for exact timing
+                                    com.example.stora.notification.ReminderAlarmManager.scheduleExactAlarm(
+                                        context = context,
+                                        reminderId = reminderEntity.id,
+                                        reminderTitle = reminderEntity.title ?: "Pengingat",
+                                        reminderType = "custom",
+                                        serverReminderId = reminderEntity.serverId,
+                                        scheduledTimeMillis = scheduledTime
+                                    )
+                                    
+                                    // Schedule WorkManager as backup
+                                    com.example.stora.notification.ReminderScheduler.scheduleCustomReminder(
+                                        context,
+                                        reminderEntity.id,
+                                        scheduledTime
+                                    )
+                                    
+                                    Log.d(TAG, "📅 Scheduled alarms for synced reminder: ${reminderEntity.title}")
+                                }
+                            }
+                            
                             syncedCount++
                         }
                     }
@@ -555,33 +584,58 @@ class NotificationRepository(
                             Log.d(TAG, "🗑 Deleted all local notifications for serverReminderId=$reminderId")
                         }
                         
-                        // Second pass: insert server notifications and delete duplicates by title+timestamp
+                        // Second pass: insert server notifications and delete duplicates by title+message
                         serverHistory.forEach { serverNotification ->
                             val existingByServerId = historyDao.getNotificationByServerId(serverNotification.idNotifikasi)
                             
                             if (existingByServerId == null) {
-                                // IMPORTANT: Also delete by title and timestamp to handle mismatched reminder IDs
-                                // This happens when reminder is created offline and gets new ID after sync
+                                // Parse server notification timestamp to determine the date range
+                                val serverTimestamp = serverNotification.tanggal?.let {
+                                    try {
+                                        val isoFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                                        isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                        isoFormat.parse(it.replace(".000Z", ""))?.time
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                } ?: System.currentTimeMillis()
+                                
+                                // Calculate the date range based on server notification's timestamp
+                                val calendar = java.util.Calendar.getInstance()
+                                calendar.timeInMillis = serverTimestamp
+                                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                calendar.set(java.util.Calendar.MINUTE, 0)
+                                calendar.set(java.util.Calendar.SECOND, 0)
+                                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                                val startOfDay = calendar.timeInMillis
+                                calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                                val endOfDay = calendar.timeInMillis
+                                
+                                // Delete local notification with same title AND message on the same day
                                 val title = serverNotification.judul
+                                val message = serverNotification.pesan
+                                
+                                if (!title.isNullOrEmpty() && !message.isNullOrEmpty()) {
+                                    // First try to delete by title+message (more specific)
+                                    val existingByTitleMessage = historyDao.getNotificationByTitleMessageAndDate(
+                                        userId, title, message, startOfDay, endOfDay
+                                    )
+                                    if (existingByTitleMessage != null && existingByTitleMessage.isLocallyCreated) {
+                                        // Delete the local version - will be replaced by server version
+                                        historyDao.deleteNotification(existingByTitleMessage.id)
+                                        Log.d(TAG, "🗑 Deleted local notification by title+message: '$title'")
+                                    }
+                                }
+                                
+                                // Also delete by just title as fallback
                                 if (!title.isNullOrEmpty()) {
-                                    // Calculate today's timestamp range
-                                    val calendar = java.util.Calendar.getInstance()
-                                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-                                    calendar.set(java.util.Calendar.MINUTE, 0)
-                                    calendar.set(java.util.Calendar.SECOND, 0)
-                                    calendar.set(java.util.Calendar.MILLISECOND, 0)
-                                    val startOfDay = calendar.timeInMillis
-                                    calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
-                                    val endOfDay = calendar.timeInMillis
-                                    
-                                    // Delete local notification with same title on same day
                                     historyDao.deleteLocalNotificationByTitleAndDate(
                                         userId,
                                         title,
                                         startOfDay,
                                         endOfDay
                                     )
-                                    Log.d(TAG, "🗑 Deleted local notification by title='$title'")
+                                    Log.d(TAG, "🗑 Deleted local notification by title='$title' for date=$startOfDay")
                                 }
                                 
                                 // Insert server version

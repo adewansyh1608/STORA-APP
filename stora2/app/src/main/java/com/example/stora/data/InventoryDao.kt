@@ -90,9 +90,13 @@ interface InventoryDao {
     @Query("SELECT SUM(quantity) FROM inventory_items WHERE userId = :userId AND isDeleted = 0")
     suspend fun getTotalQuantity(userId: Int): Int?
 
-    // Check if item exists by noinv
-    @Query("SELECT COUNT(*) FROM inventory_items WHERE noinv = :noinv AND isDeleted = 0")
-    suspend fun isNoinvExists(noinv: String): Int
+    // Check if item exists by noinv for a specific user
+    @Query("SELECT COUNT(*) FROM inventory_items WHERE noinv = :noinv AND userId = :userId AND isDeleted = 0")
+    suspend fun isNoinvExists(noinv: String, userId: Int): Int
+    
+    // Check if item exists by noinv for a specific user, excluding a specific item (for updates)
+    @Query("SELECT COUNT(*) FROM inventory_items WHERE noinv = :noinv AND userId = :userId AND id != :excludeId AND isDeleted = 0")
+    suspend fun isNoinvExistsExcluding(noinv: String, userId: Int, excludeId: String): Int
 
     // Get inventory item by code (noinv) - synchronous for sync operations
     @Query("SELECT * FROM inventory_items WHERE noinv = :code AND isDeleted = 0 LIMIT 1")

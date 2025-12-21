@@ -140,6 +140,17 @@ class InventoryRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
+                // Check for duplicate no inventaris in local Room database
+                // This works in both online and offline modes
+                Log.d(TAG, "Checking for duplicate noinv: '${item.noinv}' for userId: $userId")
+                val duplicateCount = inventoryDao.isNoinvExists(item.noinv, userId)
+                Log.d(TAG, "Duplicate check result: duplicateCount=$duplicateCount for noinv='${item.noinv}'")
+                if (duplicateCount > 0) {
+                    Log.w(TAG, "❌ Duplicate no inventaris detected in Room: ${item.noinv}")
+                    return@withContext Result.failure(Exception("No Inventaris '${item.noinv}' sudah ada. Silakan gunakan nomor yang berbeda."))
+                }
+                Log.d(TAG, "✓ No duplicate found, proceeding to save")
+
                 val authHeader = tokenManager.getAuthHeader()
                 
                 // If online and have auth, try to create on server first
@@ -234,6 +245,14 @@ class InventoryRepository(
                 val userId = getUserId()
                 if (userId == -1) {
                     return@withContext Result.failure(Exception("User not logged in"))
+                }
+
+                // Check for duplicate no inventaris in local Room database (excluding current item)
+                // This works in both online and offline modes
+                val duplicateCount = inventoryDao.isNoinvExistsExcluding(item.noinv, userId, item.id)
+                if (duplicateCount > 0) {
+                    Log.w(TAG, "Duplicate no inventaris detected in Room: ${item.noinv}")
+                    return@withContext Result.failure(Exception("No Inventaris '${item.noinv}' sudah ada. Silakan gunakan nomor yang berbeda."))
                 }
 
                 val authHeader = tokenManager.getAuthHeader()
@@ -672,7 +691,9 @@ class InventoryRepository(
     
     suspend fun isNoinvExists(noinv: String): Boolean {
         return withContext(Dispatchers.IO) {
-            inventoryDao.isNoinvExists(noinv) > 0
+            val userId = getUserId()
+            if (userId == -1) return@withContext false
+            inventoryDao.isNoinvExists(noinv, userId) > 0
         }
     }
 }
