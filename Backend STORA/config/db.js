@@ -60,10 +60,29 @@ const connectDB = async () => {
           CONSTRAINT fk_user_devices_user FOREIGN KEY (ID_User) REFERENCES users (ID_User) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
-      console.log('📱 user_devices table ready.');
     } catch (tableError) {
       // Table might already exist with constraints, ignore error
-      console.log('📱 user_devices table check complete.');
+    }
+
+    // Add Tanggal_Dikembalikan column to peminjaman table if it doesn't exist
+    try {
+      const [columns] = await sequelize.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = '${dbname}' 
+        AND TABLE_NAME = 'peminjaman' 
+        AND COLUMN_NAME = 'Tanggal_Dikembalikan'
+      `);
+
+      if (columns.length === 0) {
+        await sequelize.query(`
+          ALTER TABLE peminjaman 
+          ADD COLUMN Tanggal_Dikembalikan DATETIME NULL 
+          AFTER Tanggal_Kembali
+        `);
+      }
+    } catch (columnError) {
+      // Column check complete, ignore error
     }
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
