@@ -7,7 +7,7 @@ class TokenManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
-        private const val PREFS_NAME = "stora_prefs"  // Match with repository
+        private const val PREFS_NAME = "stora_prefs"
         private const val TOKEN_KEY = "auth_token"
         private const val USER_ID_KEY = "user_id"
         private const val USER_NAME_KEY = "user_name"

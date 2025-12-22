@@ -50,7 +50,6 @@ fun DetailLoanHistoryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
     
-    // Load loan data from Room
     var loanWithItems by remember { mutableStateOf<com.example.stora.data.LoanWithItems?>(null) }
     
     LaunchedEffect(loanId) {
@@ -59,13 +58,11 @@ fun DetailLoanHistoryScreen(
         }
     }
     
-    // Derive data from Room loanWithItems
     val loan = loanWithItems?.loan
     val loanItems = loanWithItems?.items ?: emptyList()
     
     val textGray = Color(0xFF585858)
     
-    // Calculate return status based on actual return date vs deadline
     val returnStatus = remember(loan) {
         loan?.let { l ->
             if (l.tanggalDikembalikan != null) {
@@ -75,7 +72,6 @@ fun DetailLoanHistoryScreen(
                     val actualReturnDate = sdf.parse(l.tanggalDikembalikan) // Actual return date
                     
                     if (returnDateDeadline != null && actualReturnDate != null) {
-                        // Check if returned after deadline
                         if (actualReturnDate.after(returnDateDeadline)) {
                             "Telat" to Color(0xFFE53935) // Red
                         } else {
@@ -159,7 +155,6 @@ fun DetailLoanHistoryScreen(
                             .padding(horizontal = 24.dp)
                             .padding(top = 32.dp, bottom = 24.dp)
                     ) {
-                        // Borrower Name at the top
                         Text(
                             text = loan.namaPeminjam,
                             fontSize = 24.sp,
@@ -169,7 +164,6 @@ fun DetailLoanHistoryScreen(
                         
                         Spacer(modifier = Modifier.height(4.dp))
                         
-                        // Phone Number
                         if (loan.noHpPeminjam.isNotEmpty()) {
                             Text(
                                 text = loan.noHpPeminjam,
@@ -181,7 +175,6 @@ fun DetailLoanHistoryScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Borrow and Return Dates
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -221,7 +214,6 @@ fun DetailLoanHistoryScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Return Status Badge
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -257,7 +249,6 @@ fun DetailLoanHistoryScreen(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        // Items Details Section
                         Text(
                             text = "Detail Barang (${loanItems.size})",
                             fontSize = 16.sp,
@@ -267,7 +258,6 @@ fun DetailLoanHistoryScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Display all items in the group
                         loanItems.forEach { item ->
                             Card(
                                 modifier = Modifier
@@ -282,7 +272,6 @@ fun DetailLoanHistoryScreen(
                                         .fillMaxWidth()
                                         .padding(16.dp)
                                 ) {
-                                    // Item Name
                                     Text(
                                         text = item.namaBarang,
                                         fontSize = 15.sp,
@@ -292,7 +281,6 @@ fun DetailLoanHistoryScreen(
                                     
                                     Spacer(modifier = Modifier.height(8.dp))
                                     
-                                    // Item Code and Quantity
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -330,7 +318,6 @@ fun DetailLoanHistoryScreen(
                                     
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
-                                    // Loan Photo
                                     if (item.imageUri != null) {
                                         Text(
                                             text = "Foto Barang",
@@ -365,7 +352,6 @@ fun DetailLoanHistoryScreen(
                                         Spacer(modifier = Modifier.height(12.dp))
                                     }
                                     
-                                    // Return Photo
                                     if (item.returnImageUri != null) {
                                         Text(
                                             text = "Foto Pengembalian",

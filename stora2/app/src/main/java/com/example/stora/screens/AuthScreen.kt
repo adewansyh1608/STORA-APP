@@ -338,7 +338,6 @@ fun LoginForm(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Handle login success
     LaunchedEffect(uiState.isSuccess, uiState.isLoggedIn) {
         if (uiState.isSuccess && uiState.isLoggedIn) {
             navController.navigate(Routes.HOME_SCREEN) {
@@ -384,7 +383,6 @@ fun LoginForm(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Error Message
         uiState.errorMessage?.let { error ->
             androidx.compose.material3.Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -453,25 +451,20 @@ fun SignUpForm(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
-    // Handle signup success
     LaunchedEffect(uiState.isSuccess, uiState.isLoggedIn) {
         if (uiState.isSuccess && uiState.isLoggedIn) {
-            // Show success message
             snackbarHostState.showSnackbar(
                 message = "Pendaftaran berhasil! Silakan login dengan akun Anda.",
                 duration = androidx.compose.material3.SnackbarDuration.Long
             )
 
-            // Clear form fields
             name = ""
             email = ""
             password = ""
             confirmPassword = ""
 
-            // Clear auth state
             authViewModel.clearState()
 
-            // Navigate back to login after showing message
             delay(1500)
             onLoginClicked()
         }
@@ -518,7 +511,6 @@ fun SignUpForm(
                 onValueChange = { confirmPassword = it }
             )
 
-            // Password match validation
             if (confirmPassword.isNotEmpty() && password != confirmPassword) {
                 Text(
                     text = "Password tidak sama",
@@ -532,7 +524,6 @@ fun SignUpForm(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Error Message
             uiState.errorMessage?.let { error ->
                 androidx.compose.material3.Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -597,7 +588,6 @@ fun SignUpForm(
             )
         }
 
-        // Custom styled Snackbar Host 
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -650,7 +640,6 @@ fun ForgotPasswordForm(
     var confirmPassword by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // Handle reset success
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess && !uiState.isLoggedIn) {
             showSuccessDialog = true
@@ -712,7 +701,6 @@ fun ForgotPasswordForm(
                 onValueChange = { confirmPassword = it }
             )
 
-            // Password match validation
             if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
                 Text(
                     text = "Password tidak sama",
@@ -726,7 +714,6 @@ fun ForgotPasswordForm(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Error Message
             uiState.errorMessage?.let { error ->
                 androidx.compose.material3.Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -785,7 +772,6 @@ fun ForgotPasswordForm(
             )
         }
 
-        // Success dialog
         if (showSuccessDialog) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = {
@@ -821,7 +807,6 @@ fun StoraTextField(
     var internalText by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(!isPassword) }
 
-    // Use external value if provided, otherwise use internal state
     val textValue = if (onValueChange != null) value else internalText
     val textOnValueChange: (String) -> Unit = onValueChange ?: { newValue ->
         internalText = newValue

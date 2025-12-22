@@ -402,7 +402,6 @@ fun EditItemForm(
                             errorMessage = error
                         }
                     )
-                    // Note: Don't clear error here - it's an async call
                 } else {
                     isError = true
                     errorMessage = "Semua kolom harus diisi!"

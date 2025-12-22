@@ -9,10 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
-/**
- * Repository for managing notification data (reminders and notification history)
- * with offline-first sync support.
- */
 class NotificationRepository(
     private val reminderDao: ReminderDao,
     private val historyDao: NotificationHistoryDao,
@@ -24,13 +20,11 @@ class NotificationRepository(
         private const val TAG = "NotificationRepository"
     }
 
-    // ============ User ID Helper ============
     
     private fun getUserId(): Int {
         return tokenManager.getUserId()
     }
 
-    // ============ Network Check ============
     
     fun isOnline(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
@@ -39,27 +33,16 @@ class NotificationRepository(
         return activeNetwork?.isConnectedOrConnecting == true
     }
 
-    // ============ Reminder Operations ============
-    
-    /**
-     * Get all reminders for current user
-     */
     fun getAllReminders(): Flow<List<ReminderEntity>> {
         val userId = getUserId()
         return reminderDao.getAllReminders(userId)
     }
     
-    /**
-     * Get active reminders for current user
-     */
     fun getActiveReminders(): Flow<List<ReminderEntity>> {
         val userId = getUserId()
         return reminderDao.getActiveReminders(userId)
     }
     
-    /**
-     * Get periodic reminder for current user
-     */
     suspend fun getPeriodicReminder(): ReminderEntity? {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -67,17 +50,11 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Get custom reminders for current user
-     */
     fun getCustomReminders(): Flow<List<ReminderEntity>> {
         val userId = getUserId()
         return reminderDao.getCustomReminders(userId)
     }
     
-    /**
-     * Insert or update a reminder - server-first when online
-     */
     suspend fun saveReminder(reminder: ReminderEntity): Result<ReminderEntity> {
         return withContext(Dispatchers.IO) {
             try {
@@ -89,7 +66,7 @@ class NotificationRepository(
                 val authHeader = tokenManager.getAuthHeader()
                 val reminderWithUser = reminder.copy(userId = userId)
                 
-                // If online, try to save to server first
+
                 if (authHeader != null && isOnline()) {
                     Log.d(TAG, "Online mode: trying to save reminder to server first")
                     
@@ -97,17 +74,14 @@ class NotificationRepository(
                         val request = reminderWithUser.toApiRequest()
                         
                         val response = if (reminder.serverId != null) {
-                            // Update existing
                             apiService.updateReminder(authHeader, reminder.serverId, request)
                         } else {
-                            // Create new
                             apiService.createReminder(authHeader, request)
                         }
                         
                         Log.d(TAG, "Server response code: ${response.code()}")
                         
                         if (response.isSuccessful && response.body()?.success == true) {
-                            // Server accepted - save to Room with serverId
                             val serverData = response.body()?.data
                             val itemToSave = reminderWithUser.copy(
                                 serverId = serverData?.idReminder ?: reminder.serverId,
@@ -119,7 +93,6 @@ class NotificationRepository(
                             Log.d(TAG, "✓ Reminder saved to server and locally: ${reminder.title}")
                             return@withContext Result.success(itemToSave)
                         } else {
-                            // Server rejected
                             val errorBody = response.errorBody()?.string()
                             Log.e(TAG, "Server rejected: $errorBody")
                             
@@ -134,11 +107,9 @@ class NotificationRepository(
                         }
                     } catch (networkError: Exception) {
                         Log.w(TAG, "Network error, will save locally for later sync: ${networkError.message}")
-                        // Fall through to offline save
                     }
                 }
                 
-                // Offline mode or network error - save locally with needsSync flag
                 Log.d(TAG, "Saving reminder locally for later sync")
                 val itemWithSyncFlag = reminderWithUser.copy(
                     needsSync = true,
@@ -155,16 +126,12 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Delete a reminder
-     */
     suspend fun deleteReminder(id: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
                 val reminder = reminderDao.getReminderById(id)
                 
                 if (reminder?.serverId != null && isOnline()) {
-                    // Has server ID and online - delete from server
                     val authHeader = tokenManager.getAuthHeader()
                     if (authHeader != null) {
                         try {
@@ -180,7 +147,6 @@ class NotificationRepository(
                     }
                 }
                 
-                // Offline or no server ID - soft delete
                 reminderDao.softDeleteReminder(id)
                 Log.d(TAG, "Reminder soft deleted locally")
                 Result.success(Unit)
@@ -191,9 +157,6 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Update last notified timestamp for a reminder
-     */
     suspend fun updateLastNotified(id: String) {
         withContext(Dispatchers.IO) {
             val timestamp = System.currentTimeMillis()
@@ -201,9 +164,6 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Get due reminders that need to fire
-     */
     suspend fun getDueReminders(): List<ReminderEntity> {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -212,12 +172,9 @@ class NotificationRepository(
             val currentTime = System.currentTimeMillis()
             val allDue = reminderDao.getDueReminders(userId, currentTime)
             
-            // Filter periodic reminders that are actually due
             allDue.filter { reminder ->
                 if (reminder.reminderType == "periodic") {
                     val months = reminder.periodicMonths ?: 3
-                    // FIXED: Use lastNotified if exists, otherwise use lastModified (creation time)
-                    // This prevents new reminders from immediately firing
                     val baseline = reminder.lastNotified ?: reminder.lastModified
                     val intervalMs = months * 30L * 24 * 60 * 60 * 1000
                     val isDue = (currentTime - baseline) >= intervalMs
@@ -225,27 +182,17 @@ class NotificationRepository(
                     Log.d(TAG, "Periodic reminder ${reminder.title}: baseline=${baseline}, interval=${intervalMs}ms, isDue=$isDue")
                     isDue
                 } else {
-                    // Custom reminders - already filtered by SQL
                     true
                 }
             }
         }
     }
 
-    // ============ Notification History Operations ============
-    
-    /**
-     * Get all notification history for current user
-     */
     fun getNotificationHistory(): Flow<List<NotificationHistoryEntity>> {
         val userId = getUserId()
         return historyDao.getAllHistory(userId)
     }
     
-    /**
-     * Record a local notification (when notification fires offline)
-     * Includes deduplication check to prevent duplicate notifications
-     */
     suspend fun recordLocalNotification(
         title: String,
         message: String,
@@ -261,7 +208,7 @@ class NotificationRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
                 
-                // Check for existing notification (deduplication)
+
                 if (relatedReminderId != null) {
                     val calendar = java.util.Calendar.getInstance()
                     calendar.timeInMillis = timestamp
@@ -304,18 +251,12 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Mark notification as read
-     */
     suspend fun markNotificationAsRead(id: String) {
         withContext(Dispatchers.IO) {
             historyDao.markAsRead(id)
         }
     }
     
-    /**
-     * Mark all notifications as read
-     */
     suspend fun markAllNotificationsAsRead() {
         withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -325,9 +266,6 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Get unread notification count
-     */
     suspend fun getUnreadCount(): Int {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()
@@ -339,11 +277,6 @@ class NotificationRepository(
         }
     }
 
-    // ============ Sync Operations ============
-    
-    /**
-     * Sync reminders and notifications to server
-     */
     suspend fun syncToServer(): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
@@ -361,7 +294,6 @@ class NotificationRepository(
                 var syncedCount = 0
                 var errorCount = 0
                 
-                // Sync deleted reminders first
                 val deletedReminders = reminderDao.getUnsyncedReminders(userId).filter { it.isDeleted }
                 deletedReminders.forEach { reminder ->
                     if (reminder.serverId != null) {
@@ -377,12 +309,10 @@ class NotificationRepository(
                             errorCount++
                         }
                     } else {
-                        // No server ID - just delete locally
                         reminderDao.deleteReminder(reminder.id)
                     }
                 }
                 
-                // Sync new/updated reminders
                 val unsyncedReminders = reminderDao.getUnsyncedReminders(userId).filter { !it.isDeleted }
                 unsyncedReminders.forEach { reminder ->
                     try {
@@ -411,11 +341,9 @@ class NotificationRepository(
                     }
                 }
                 
-                // Sync local notifications to server
                 val unsyncedNotifications = historyDao.getUnsyncedNotifications(userId)
                 unsyncedNotifications.forEach { notification ->
                     try {
-                        // Create notification on server with full timestamp and ID_Reminder
                         val requestBody = mutableMapOf<String, Any>(
                             "Judul" to notification.title,
                             "Pesan" to notification.message,
@@ -423,7 +351,6 @@ class NotificationRepository(
                             "Status" to notification.status
                         )
                         
-                        // Add ID_Reminder if available
                         val reminderId = notification.serverReminderId 
                             ?: notification.relatedReminderId?.toIntOrNull()
                         if (reminderId != null) {
@@ -437,9 +364,7 @@ class NotificationRepository(
                         
                         if (response.isSuccessful && response.body()?.success == true) {
                             val serverData = response.body()?.data
-                            // Check if it was a duplicate
                             val isDuplicate = response.body()?.let { body ->
-                                // Check if response contains isDuplicate flag
                                 try {
                                     val json = org.json.JSONObject(response.raw().toString())
                                     json.optBoolean("isDuplicate", false)
@@ -461,7 +386,7 @@ class NotificationRepository(
                     }
                 }
                 
-                // Delete synced deleted reminders
+
                 reminderDao.deleteSyncedDeletedReminders()
                 
                 Log.d(TAG, "Sync to server completed: $syncedCount items synced, $errorCount errors")
@@ -478,9 +403,6 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Sync reminders and notifications from server
-     */
     suspend fun syncFromServer(): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
@@ -497,34 +419,28 @@ class NotificationRepository(
                 
                 var syncedCount = 0
                 
-                // Sync reminders from server
                 try {
                     val remindersResponse = apiService.getReminders(authHeader)
                     if (remindersResponse.isSuccessful && remindersResponse.body()?.success == true) {
                         val serverReminders = remindersResponse.body()?.data ?: emptyList()
                         val serverReminderIds = serverReminders.mapNotNull { it.idReminder }.toSet()
                         
-                        // Get local synced reminders
                         val localSyncedReminders = reminderDao.getSyncedRemindersWithServerId(userId)
                         
-                        // Delete local reminders that no longer exist on server
                         localSyncedReminders.filter { it.serverId !in serverReminderIds }.forEach { local ->
                             if (!local.needsSync) {
                                 reminderDao.deleteReminder(local.id)
                             }
                         }
                         
-                        // Add/update reminders from server
                         serverReminders.forEach { serverReminder ->
                             val existingLocal = reminderDao.getReminderByServerId(serverReminder.idReminder)
                             
-                            // Skip if local has pending changes
                             if (existingLocal != null && existingLocal.needsSync) {
                                 Log.d(TAG, "⏭ Skipping server update for reminder - local changes pending")
                                 return@forEach
                             }
                             
-                            // Use new fromApiModel that preserves local data when server returns null
                             val reminderEntity = ReminderEntity.fromApiModel(
                                 serverReminder,
                                 existingLocal,
@@ -533,14 +449,11 @@ class NotificationRepository(
                             reminderDao.insertReminder(reminderEntity)
                             Log.d(TAG, "✓ Synced reminder from server: ${reminderEntity.title}, scheduledDatetime=${reminderEntity.scheduledDatetime}")
                             
-                            // Schedule AlarmManager and WorkManager for custom reminders
-                            // This ensures notifications work on ALL devices, not just the creating device
                             if (reminderEntity.reminderType == "custom" && 
                                 reminderEntity.isActive && 
                                 !reminderEntity.isDeleted) {
                                 val scheduledTime = reminderEntity.scheduledDatetime
                                 if (scheduledTime != null && scheduledTime > System.currentTimeMillis()) {
-                                    // Schedule AlarmManager for exact timing
                                     com.example.stora.notification.ReminderAlarmManager.scheduleExactAlarm(
                                         context = context,
                                         reminderId = reminderEntity.id,
@@ -550,7 +463,6 @@ class NotificationRepository(
                                         scheduledTimeMillis = scheduledTime
                                     )
                                     
-                                    // Schedule WorkManager as backup
                                     com.example.stora.notification.ReminderScheduler.scheduleCustomReminder(
                                         context,
                                         reminderEntity.id,
@@ -568,28 +480,23 @@ class NotificationRepository(
                     Log.e(TAG, "Error syncing reminders from server", e)
                 }
                 
-                // Sync notification history from server
                 try {
                     val historyResponse = apiService.getNotificationHistory(authHeader)
                     if (historyResponse.isSuccessful && historyResponse.body()?.success == true) {
                         val serverHistory = historyResponse.body()?.data ?: emptyList()
                         
-                        // First pass: collect all server notification reminder IDs
                         val serverReminderIds = serverHistory.mapNotNull { it.idReminder }.toSet()
                         Log.d(TAG, "Server has notifications for reminder IDs: $serverReminderIds")
                         
-                        // Delete all local (offline) notifications that have matching serverReminderId
                         serverReminderIds.forEach { reminderId ->
                             historyDao.deleteAllLocalNotificationsByServerReminderId(userId, reminderId)
                             Log.d(TAG, "🗑 Deleted all local notifications for serverReminderId=$reminderId")
                         }
                         
-                        // Second pass: insert server notifications and delete duplicates by title+message
                         serverHistory.forEach { serverNotification ->
                             val existingByServerId = historyDao.getNotificationByServerId(serverNotification.idNotifikasi)
                             
                             if (existingByServerId == null) {
-                                // Parse server notification timestamp to determine the date range
                                 val serverTimestamp = serverNotification.tanggal?.let {
                                     try {
                                         val isoFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
@@ -600,7 +507,6 @@ class NotificationRepository(
                                     }
                                 } ?: System.currentTimeMillis()
                                 
-                                // Calculate the date range based on server notification's timestamp
                                 val calendar = java.util.Calendar.getInstance()
                                 calendar.timeInMillis = serverTimestamp
                                 calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -611,23 +517,19 @@ class NotificationRepository(
                                 calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
                                 val endOfDay = calendar.timeInMillis
                                 
-                                // Delete local notification with same title AND message on the same day
                                 val title = serverNotification.judul
                                 val message = serverNotification.pesan
                                 
                                 if (!title.isNullOrEmpty() && !message.isNullOrEmpty()) {
-                                    // First try to delete by title+message (more specific)
                                     val existingByTitleMessage = historyDao.getNotificationByTitleMessageAndDate(
                                         userId, title, message, startOfDay, endOfDay
                                     )
                                     if (existingByTitleMessage != null && existingByTitleMessage.isLocallyCreated) {
-                                        // Delete the local version - will be replaced by server version
                                         historyDao.deleteNotification(existingByTitleMessage.id)
                                         Log.d(TAG, "🗑 Deleted local notification by title+message: '$title'")
                                     }
                                 }
                                 
-                                // Also delete by just title as fallback
                                 if (!title.isNullOrEmpty()) {
                                     historyDao.deleteLocalNotificationByTitleAndDate(
                                         userId,
@@ -638,7 +540,6 @@ class NotificationRepository(
                                     Log.d(TAG, "🗑 Deleted local notification by title='$title' for date=$startOfDay")
                                 }
                                 
-                                // Insert server version
                                 val historyEntity = NotificationHistoryEntity.fromApiModel(
                                     serverNotification,
                                     null,
@@ -663,19 +564,14 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Perform full sync (to server first, then from server)
-     */
     suspend fun performFullSync(): Result<Pair<Int, Int>> {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Starting full notification sync...")
                 
-                // First, sync local changes to server
                 val toServerResult = syncToServer()
                 val toServerCount = toServerResult.getOrDefault(0)
                 
-                // Then, sync server data to local
                 val fromServerResult = syncFromServer()
                 val fromServerCount = fromServerResult.getOrDefault(0)
                 
@@ -688,9 +584,6 @@ class NotificationRepository(
         }
     }
     
-    /**
-     * Get unsynced count for reminders
-     */
     suspend fun getUnsyncedReminderCount(): Int {
         return withContext(Dispatchers.IO) {
             val userId = getUserId()

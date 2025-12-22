@@ -67,11 +67,9 @@ fun DetailLoanScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
     
-    // Load loan data from Room - use a refresh trigger to reload when coming back
     var loanWithItems by remember { mutableStateOf<com.example.stora.data.LoanWithItems?>(null) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
-    // Reload loan data when loanId changes OR when refreshTrigger changes (e.g., after navigation back)
     LaunchedEffect(loanId, refreshTrigger) {
         if (loanId.isNotEmpty()) {
             loanWithItems = loanViewModel.getLoanById(loanId)
@@ -79,10 +77,8 @@ fun DetailLoanScreen(
         }
     }
     
-    // Observe active loans to detect changes (when coming back from edit)
     val activeLoans by loanViewModel.activeLoans.collectAsState()
     
-    // Reload when activeLoans changes (triggered by edit/sync operations)
     LaunchedEffect(activeLoans) {
         if (loanId.isNotEmpty()) {
             val updatedLoan = loanViewModel.getLoanById(loanId)
@@ -93,13 +89,11 @@ fun DetailLoanScreen(
         }
     }
     
-    // Map untuk menyimpan return image per item - now uses String item ID
     val returnImageUris = remember { mutableStateMapOf<String, Uri?>() }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var selectedItemForReturn by remember { mutableStateOf<String?>(null) }
     var showImagePickerDialog by remember { mutableStateOf(false) }
     
-    // Return date and time states
     val calendar = remember { java.util.Calendar.getInstance() }
     val sdf = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
     val timeSdf = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
@@ -109,14 +103,11 @@ fun DetailLoanScreen(
     var showReturnTimePicker by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
-    // Derive data from Room loanWithItems
     val loan = loanWithItems?.loan
     val loanItems = loanWithItems?.items ?: emptyList()
     
     val textGray = Color(0xFF585858)
     
-    // Check if edit is allowed (only until 1 hour before deadline)
-    // Recompute when loanWithItems changes
     val isEditAllowed = remember(loanWithItems?.loan?.tanggalKembali) {
         val l = loanWithItems?.loan
         if (l == null) {
@@ -128,7 +119,6 @@ fun DetailLoanScreen(
             val deadline = l.tanggalKembali
             android.util.Log.d("DetailLoanScreen", "Checking isEditAllowed for deadline: $deadline")
             
-            // Support multiple date formats
             val dateFormats = listOf(
                 java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()),
                 java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()),
@@ -137,7 +127,6 @@ fun DetailLoanScreen(
                 java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
             )
             
-            // Try each format until one works
             var deadlineDate: java.util.Date? = null
             var usedFormat: java.text.SimpleDateFormat? = null
             for (format in dateFormats) {
@@ -151,7 +140,6 @@ fun DetailLoanScreen(
                         break
                     }
                 } catch (e: Exception) {
-                    // Try next format
                 }
             }
             
@@ -160,20 +148,16 @@ fun DetailLoanScreen(
                 return@remember false
             }
             
-            // Determine if the format has time component
             val hasTimeComponent = deadline.contains(":") || 
                 (usedFormat?.toPattern()?.contains("HH") == true)
             
-            // Calculate the cutoff time (1 hour before deadline)
             val cutoffTime = java.util.Calendar.getInstance().apply {
                 time = deadlineDate
-                // If no time was specified in deadline, set to end of day first
                 if (!hasTimeComponent) {
                     set(java.util.Calendar.HOUR_OF_DAY, 23)
                     set(java.util.Calendar.MINUTE, 59)
                     set(java.util.Calendar.SECOND, 59)
                 }
-                // Subtract 1 hour from the deadline
                 add(java.util.Calendar.HOUR_OF_DAY, -1)
             }
             
@@ -187,7 +171,6 @@ fun DetailLoanScreen(
         }
     }
     
-    // Image picker launcher for return photo
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -197,7 +180,6 @@ fun DetailLoanScreen(
         selectedItemForReturn = null
     }
     
-    // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -209,7 +191,6 @@ fun DetailLoanScreen(
         }
     }
     
-    // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -227,7 +208,6 @@ fun DetailLoanScreen(
     }
     
     if (loan == null) {
-        // Show loading indicator while loan is being fetched
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -263,10 +243,8 @@ fun DetailLoanScreen(
                     }
                 },
                 actions = {
-                    // Edit button - only enabled until 1 hour before deadline
                     IconButton(
                         onClick = { 
-                            // loanId is already the roomLoanId
                             navController.navigate("edit_loan/$loanId")
                         },
                         enabled = isEditAllowed
@@ -277,7 +255,6 @@ fun DetailLoanScreen(
                             tint = if (isEditAllowed) StoraWhite else StoraWhite.copy(alpha = 0.5f)
                         )
                     }
-                    // Delete button - only enabled until 1 hour before deadline
                     IconButton(
                         onClick = { showDeleteDialog = true },
                         enabled = isEditAllowed
@@ -302,7 +279,6 @@ fun DetailLoanScreen(
                 .background(StoraBlueDark)
                 .padding(top = 24.dp)
         ) {
-            // White content area with rounded top corners
             androidx.compose.animation.AnimatedVisibility(
                 visible = isVisible,
                 enter = slideInVertically(animationSpec = tween(800, delayMillis = 200)) { it } + fadeIn(animationSpec = tween(800, delayMillis = 200)),
@@ -320,7 +296,6 @@ fun DetailLoanScreen(
                             .padding(horizontal = 24.dp)
                             .padding(top = 32.dp, bottom = 24.dp)
                     ) {
-                        // Borrower Name at the top
                         Text(
                             text = loan.namaPeminjam,
                             fontSize = 24.sp,
@@ -330,7 +305,6 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(4.dp))
                         
-                        // Phone Number
                         if (loan.noHpPeminjam.isNotEmpty()) {
                             Text(
                                 text = loan.noHpPeminjam,
@@ -341,7 +315,6 @@ fun DetailLoanScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                         }
                         
-                        // Borrow Date
                         Text(
                             text = loan.tanggalPinjam,
                             fontSize = 14.sp,
@@ -351,7 +324,6 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        // Tanggal Pengembalian
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -391,7 +363,6 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(28.dp))
                         
-                        // Items Details Section
                         Text(
                             text = "Detail Barang (${loanItems.size})",
                             fontSize = 16.sp,
@@ -401,7 +372,6 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Display all items in the group
                         loanItems.forEach { item ->
                             Card(
                                 modifier = Modifier
@@ -416,7 +386,6 @@ fun DetailLoanScreen(
                                         .fillMaxWidth()
                                         .padding(16.dp)
                                 ) {
-                                    // Item Name
                                     Text(
                                         text = item.namaBarang,
                                         fontSize = 15.sp,
@@ -426,7 +395,6 @@ fun DetailLoanScreen(
                                     
                                     Spacer(modifier = Modifier.height(8.dp))
                                     
-                                    // Item Code and Quantity
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -473,7 +441,6 @@ fun DetailLoanScreen(
                                     
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
-                                    // Photo Section - Loan Photo
                                     if (item.imageUri != null) {
                                         Text(
                                             text = "Foto Barang",
@@ -508,7 +475,6 @@ fun DetailLoanScreen(
                                     
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
-                                    // Return Photo Section - Per Item
                                     Text(
                                         text = "Foto Pengembalian",
                                         fontSize = 11.sp,
@@ -569,7 +535,6 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(32.dp))
                         
-                        // Return Date and Time Section
                         Text(
                             text = "Tanggal & Jam Pengembalian",
                             fontSize = 14.sp,
@@ -583,7 +548,6 @@ fun DetailLoanScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Return Date
                             OutlinedTextField(
                                 value = returnDate,
                                 onValueChange = {},
@@ -608,7 +572,6 @@ fun DetailLoanScreen(
                                 )
                             )
                             
-                            // Return Time
                             OutlinedTextField(
                                 value = returnTime,
                                 onValueChange = {},
@@ -636,24 +599,19 @@ fun DetailLoanScreen(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        // Return Button
                         Button(
                             onClick = {
-                                // Combine return date and time
                                 val fullReturnDateTime = "$returnDate $returnTime"
                                 
-                                // Prepare item return images map using item id
                                 val itemReturnImages = loanItems.associate { item ->
                                     item.id to returnImageUris[item.id]?.toString()
                                 }
                                 
-                                // Call ViewModel to update Room and sync
                                 loanViewModel.returnLoan(
                                     loanId = loanId,
                                     returnDateTime = fullReturnDateTime,
                                     itemReturnImages = itemReturnImages,
                                     onSuccess = {
-                                        // Navigate back to LoansScreen
                                         navController.popBackStack(Routes.LOANS_SCREEN, false)
                                     },
                                     onError = { error ->
@@ -696,7 +654,6 @@ fun DetailLoanScreen(
             }
         }
 
-        // Image Picker Dialog
         if (showImagePickerDialog) {
             DetailLoanImagePickerDialog(
                 onDismiss = { showImagePickerDialog = false },
@@ -711,7 +668,6 @@ fun DetailLoanScreen(
             )
         }
         
-        // Return Date Picker
         if (showReturnDatePicker) {
             val datePickerState = rememberDatePickerState()
             DatePickerDialog(
@@ -740,7 +696,6 @@ fun DetailLoanScreen(
             }
         }
         
-        // Return Time Picker
         if (showReturnTimePicker) {
             val timePickerState = rememberTimePickerState(
                 initialHour = calendar.get(java.util.Calendar.HOUR_OF_DAY),
@@ -776,7 +731,6 @@ fun DetailLoanScreen(
         }
     }
     
-    // Delete Confirmation Dialog
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -797,7 +751,6 @@ fun DetailLoanScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            // Use loanId directly
                             loanViewModel.deleteLoan(
                                 loanId = loanId,
                                 onSuccess = {
@@ -876,7 +829,6 @@ private fun DetailLoanImagePickerDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Gallery Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -911,7 +863,6 @@ private fun DetailLoanImagePickerDialog(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Camera Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

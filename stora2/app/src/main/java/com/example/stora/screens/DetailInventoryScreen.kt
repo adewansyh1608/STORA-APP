@@ -114,7 +114,6 @@ fun DetailInventoryScreen(
             }
         }
 
-        // Delete confirmation dialog
         if (showDeleteDialog && currentItem != null) {
             val textGray = Color(0xFF585858)
 
@@ -135,7 +134,6 @@ fun DetailInventoryScreen(
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Icon
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -153,7 +151,6 @@ fun DetailInventoryScreen(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Title
                         Text(
                             text = "Hapus Item?",
                             fontSize = 22.sp,
@@ -163,7 +160,6 @@ fun DetailInventoryScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Description
                         Text(
                             text = "Item ${currentItem.name} akan dihapus secara permanen dan tidak dapat dikembalikan.",
                             fontSize = 14.sp,
@@ -174,12 +170,10 @@ fun DetailInventoryScreen(
 
                         Spacer(modifier = Modifier.height(28.dp))
 
-                        // Buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Cancel Button
                             OutlinedButton(
                                 onClick = { showDeleteDialog = false },
                                 modifier = Modifier
@@ -198,7 +192,6 @@ fun DetailInventoryScreen(
                                 )
                             }
 
-                            // Delete Button
                             Button(
                                 onClick = {
                                     viewModel.deleteInventoryItem(
@@ -265,7 +258,6 @@ fun DetailTopBar(
                 .padding(start = 16.dp)
         )
 
-        // Action Icons
         if (onDeleteClick != null) {
             IconButton(onClick = onDeleteClick) {
                 Icon(
@@ -317,7 +309,6 @@ fun DetailContent(item: InventoryItem) {
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Photo Item
             item.photoUri?.let { photoUriString ->
                 Box(
                     modifier = Modifier
@@ -342,7 +333,6 @@ fun DetailContent(item: InventoryItem) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
-                // Quantity Breakdown Section
                 Text(
                     text = "Stok Barang",
                     fontSize = 16.sp,
@@ -351,17 +341,14 @@ fun DetailContent(item: InventoryItem) {
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
                 
-                // Calculate quantities
                 val totalQuantity = item.quantity
                 val borrowedQuantity = LoansData.getBorrowedQuantity(item)
                 val availableQuantity = totalQuantity - borrowedQuantity
                 
-                // Quantity Cards Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Total Quantity Card
                     QuantityCard(
                         modifier = Modifier.weight(1f),
                         label = "Total",
@@ -370,7 +357,6 @@ fun DetailContent(item: InventoryItem) {
                         valueColor = StoraBlueDark
                     )
                     
-                    // Borrowed Quantity Card
                     QuantityCard(
                         modifier = Modifier.weight(1f),
                         label = "Dipinjam",
@@ -379,7 +365,6 @@ fun DetailContent(item: InventoryItem) {
                         valueColor = Color(0xFFE65100)
                     )
                     
-                    // Available Quantity Card
                     QuantityCard(
                         modifier = Modifier.weight(1f),
                         label = "Tersedia",

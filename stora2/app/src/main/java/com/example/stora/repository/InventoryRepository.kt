@@ -73,7 +73,6 @@ class InventoryRepository(
     private fun createPhotoPart(photoUri: String?): MultipartBody.Part? {
         if (photoUri == null) return null
         
-        // Skip if photo is already from server (no need to re-upload)
         if (isPhotoFromServer(photoUri)) {
             Log.d(TAG, "Photo is from server, skipping upload: $photoUri")
             return null
@@ -83,7 +82,6 @@ class InventoryRepository(
             val uri = Uri.parse(photoUri)
             val file = uriToFile(uri) ?: return null
             
-            // Determine MIME type based on file extension
             val extension = file.extension.lowercase()
             val mimeType = when (extension) {
                 "jpg", "jpeg" -> "image/jpeg"
@@ -140,8 +138,6 @@ class InventoryRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
-                // Check for duplicate no inventaris in local Room database
-                // This works in both online and offline modes
                 Log.d(TAG, "Checking for duplicate noinv: '${item.noinv}' for userId: $userId")
                 val duplicateCount = inventoryDao.isNoinvExists(item.noinv, userId)
                 Log.d(TAG, "Duplicate check result: duplicateCount=$duplicateCount for noinv='${item.noinv}'")
@@ -153,7 +149,6 @@ class InventoryRepository(
 
                 val authHeader = tokenManager.getAuthHeader()
                 
-                // If online and have auth, try to create on server first
                 if (authHeader != null && isOnline()) {
                     Log.d(TAG, "Online mode: trying to create item on server first")
                     
@@ -184,7 +179,6 @@ class InventoryRepository(
                         Log.d(TAG, "Server response code: ${response.code()}")
                         
                         if (response.isSuccessful && response.body()?.success == true) {
-                            // Server accepted - now save to Room with serverId
                             val serverId = response.body()?.data?.idInventaris
                             val serverPhotoUrl = response.body()?.data?.foto?.firstOrNull()?.foto
                             
@@ -200,11 +194,9 @@ class InventoryRepository(
                             Log.d(TAG, "✓ Item created on server and saved locally: ${item.name}")
                             return@withContext Result.success(itemToSave)
                         } else {
-                            // Server rejected - return error with message
                             val errorBody = response.errorBody()?.string()
                             Log.e(TAG, "Server rejected: $errorBody")
                             
-                            // Parse error message from server response
                             val errorMessage = try {
                                 val jsonError = org.json.JSONObject(errorBody ?: "{}")
                                 jsonError.optString("message", "Gagal menyimpan data ke server")
@@ -216,11 +208,9 @@ class InventoryRepository(
                         }
                     } catch (networkError: Exception) {
                         Log.w(TAG, "Network error, will save locally for later sync: ${networkError.message}")
-                        // Network error - fall through to save locally
                     }
                 }
                 
-                // Offline mode or network error - save locally with needsSync flag
                 Log.d(TAG, "Saving item locally for later sync")
                 val itemWithSyncFlag = item.copy(
                     userId = userId,
@@ -247,8 +237,6 @@ class InventoryRepository(
                     return@withContext Result.failure(Exception("User not logged in"))
                 }
 
-                // Check for duplicate no inventaris in local Room database (excluding current item)
-                // This works in both online and offline modes
                 val duplicateCount = inventoryDao.isNoinvExistsExcluding(item.noinv, userId, item.id)
                 if (duplicateCount > 0) {
                     Log.w(TAG, "Duplicate no inventaris detected in Room: ${item.noinv}")
@@ -257,7 +245,6 @@ class InventoryRepository(
 
                 val authHeader = tokenManager.getAuthHeader()
                 
-                // If online and item has serverId, try to update on server first
                 if (authHeader != null && isOnline() && item.serverId != null) {
                     Log.d(TAG, "Online mode: trying to update item on server first (serverId: ${item.serverId})")
                     
@@ -273,7 +260,6 @@ class InventoryRepository(
                         Log.d(TAG, "Server update response code: ${response.code()}")
                         
                         if (response.isSuccessful && response.body()?.success == true) {
-                            // Server accepted - now save to Room
                             val itemToSave = item.copy(
                                 userId = userId,
                                 needsSync = false,
@@ -284,11 +270,9 @@ class InventoryRepository(
                             Log.d(TAG, "✓ Item updated on server and saved locally: ${item.name}")
                             return@withContext Result.success(itemToSave)
                         } else {
-                            // Server rejected - return error with message
                             val errorBody = response.errorBody()?.string()
                             Log.e(TAG, "Server rejected update: $errorBody")
                             
-                            // Parse error message from server response
                             val errorMessage = try {
                                 val jsonError = org.json.JSONObject(errorBody ?: "{}")
                                 jsonError.optString("message", "Gagal mengupdate data ke server")
@@ -300,11 +284,9 @@ class InventoryRepository(
                         }
                     } catch (networkError: Exception) {
                         Log.w(TAG, "Network error during update, will save locally for later sync: ${networkError.message}")
-                        // Network error - fall through to save locally
                     }
                 }
                 
-                // Offline mode, no serverId, or network error - save locally with needsSync flag
                 Log.d(TAG, "Saving updated item locally for later sync")
                 val itemWithSyncFlag = item.copy(
                     userId = userId,
@@ -381,20 +363,16 @@ class InventoryRepository(
                         val serverItems = responseBody.data ?: emptyList()
                         Log.d(TAG, "Received ${serverItems.size} items from server")
 
-                        // Get all server IDs from response
                         val serverItemIds = serverItems.mapNotNull { it.idInventaris }.toSet()
                         Log.d(TAG, "Server item IDs: $serverItemIds")
 
-                        // Get all local items that have been synced (have serverId)
                         val localSyncedItems = inventoryDao.getSyncedItemsWithServerId(userId)
                         Log.d(TAG, "Local synced items count: ${localSyncedItems.size}")
 
-                        // Find items that exist locally but NOT on server (deleted on server)
                         val itemsToDelete = localSyncedItems.filter { localItem ->
                             localItem.serverId != null && localItem.serverId !in serverItemIds
                         }
 
-                        // Delete local items that were deleted on server
                         var deletedCount = 0
                         itemsToDelete.forEach { item ->
                             try {
@@ -407,7 +385,6 @@ class InventoryRepository(
                         }
                         Log.d(TAG, "Deleted $deletedCount items that were removed from server")
 
-                        // Now add/update items from server
                         var syncedCount = 0
                         var skippedCount = 0
                         serverItems.forEach { apiModel ->
@@ -417,7 +394,6 @@ class InventoryRepository(
                                     inventoryDao.getInventoryItemByServerId(it)
                                 }
 
-                                // Skip update if local item has pending changes (needsSync = true)
                                 if (existingItem != null && existingItem.needsSync) {
                                     Log.d(TAG, "⏭ Skipping server update for ${apiModel.namaBarang} - local changes pending")
                                     skippedCount++
@@ -592,7 +568,6 @@ class InventoryRepository(
                                 val errorBody = response.errorBody()?.string()
                                 Log.e(TAG, "✗ Create failed with code ${response.code()}: $errorBody")
                                 
-                                // If server rejects with DUPLICATE_KODE_BARANG, delete from Room
                                 if (response.code() == 409 || errorBody?.contains("DUPLICATE_KODE_BARANG") == true) {
                                     Log.w(TAG, "Duplicate detected by server, removing from local database: ${item.name}")
                                     inventoryDao.deleteInventoryItem(item)
@@ -632,11 +607,9 @@ class InventoryRepository(
             try {
                 Log.d(TAG, "Starting full sync...")
 
-                // First, sync local changes to server
                 val toServerResult = syncToServer()
                 val toServerCount = toServerResult.getOrDefault(0)
 
-                // Then, sync server data to local
                 val fromServerResult = syncFromServer()
                 val fromServerCount = fromServerResult.getOrDefault(0)
 

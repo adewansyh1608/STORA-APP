@@ -43,17 +43,14 @@ fun AppNavHost(
     val tokenManager = TokenManager.getInstance(context)
     val authState by authViewModel.uiState.collectAsState()
 
-    // Navigate after successful login
     LaunchedEffect(authState.isLoggedIn, authState.isSuccess) {
         if (authState.isLoggedIn && authState.isSuccess) {
-            // Refresh profile data from token manager
             userProfileViewModel.loadProfileFromToken()
             
             navController.navigate(Routes.HOME_SCREEN) {
                 popUpTo(Routes.AUTH_SCREEN) { inclusive = true }
             }
         } else if (!authState.isLoggedIn && !tokenManager.isLoggedIn()) {
-            // User logged out, navigate to auth screen
             navController.navigate(Routes.AUTH_SCREEN) {
                 popUpTo(0) { inclusive = true }
             }

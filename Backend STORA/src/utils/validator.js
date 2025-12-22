@@ -1,7 +1,6 @@
 const { body, param, query } = require('express-validator');
 
 class Validator {
-  // User validation rules
   static userRegistration() {
     return [
       body('name')
@@ -72,7 +71,6 @@ class Validator {
     ];
   }
 
-  // Common parameter validations
   static mongoId() {
     return [
       param('id')
@@ -81,7 +79,6 @@ class Validator {
     ];
   }
 
-  // Query parameter validations
   static pagination() {
     return [
       query('page')

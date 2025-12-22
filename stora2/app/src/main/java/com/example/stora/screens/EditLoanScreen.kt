@@ -64,27 +64,21 @@ fun EditLoanScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
     
-    // Inventory data for adding new items
     val inventoryItems by inventoryViewModel.inventoryItems.collectAsState()
     var showAddItemSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     
-    // Get current loan data
     var loanWithItems by remember { mutableStateOf<com.example.stora.data.LoanWithItems?>(null) }
     
-    // Editable items state - stores current quantities, items can be removed
-    val editableItems = remember { mutableStateMapOf<String, Int>() } // itemId -> quantity
-    val removedItems = remember { mutableStateListOf<String>() } // itemIds that were removed
+    val editableItems = remember { mutableStateMapOf<String, Int>() }
+    val removedItems = remember { mutableStateListOf<String>() }
     
-    // Newly added items (not from original loan)
     val newAddedItems = remember { mutableStateListOf<LoanItemInfo>() }
     
-    // Photo handling for new items
-    var selectedNewItemForPhoto by remember { mutableStateOf<Int?>(null) } // index of new item to add photo
+    var selectedNewItemForPhoto by remember { mutableStateOf<Int?>(null) }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoPickerDialog by remember { mutableStateOf(false) }
     
-    // Image picker launcher for new items
     val newItemImagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -98,7 +92,6 @@ fun EditLoanScreen(
         showPhotoPickerDialog = false
     }
     
-    // Camera launcher for new items
     val newItemCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -114,7 +107,6 @@ fun EditLoanScreen(
         showPhotoPickerDialog = false
     }
     
-    // Camera permission launcher
     val newItemCameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -130,18 +122,15 @@ fun EditLoanScreen(
         loanWithItems = loanViewModel.getLoanById(loanId)
     }
     
-    // Date/Time states
     val calendar = remember { java.util.Calendar.getInstance() }
     val sdf = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
     val timeSdf = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
     
-    // Initialize with current deadline or current date
     var deadlineDate by remember { mutableStateOf(sdf.format(calendar.time)) }
     var deadlineTime by remember { mutableStateOf(timeSdf.format(calendar.time)) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     
-    // Update when loan data is loaded
     LaunchedEffect(loanWithItems) {
         loanWithItems?.loan?.tanggalKembali?.let { deadline ->
             if (deadline.contains(":")) {
@@ -154,7 +143,6 @@ fun EditLoanScreen(
                 deadlineDate = deadline
             }
         }
-        // Initialize editable items from loaded data
         loanWithItems?.items?.forEach { item ->
             if (!editableItems.containsKey(item.id)) {
                 editableItems[item.id] = item.jumlah
@@ -162,18 +150,10 @@ fun EditLoanScreen(
         }
     }
     
-    // Calculate available quantity for each item (inventory stock - borrowed in other loans + currently borrowed in this loan)
-    // This function gets the max available quantity that can be assigned to an item
     fun getMaxAvailableQty(kodeBarang: String, originalQty: Int): Int {
-        // Find inventory item by code
         val inventoryItem = inventoryItems.find { it.noinv == kodeBarang }
         val totalStock = inventoryItem?.quantity ?: 0
         
-        // The max quantity is the total stock in inventory
-        // Since this item is already borrowed in this loan, we can use up to:
-        // totalStock (the total in inventory) + originalQty (already borrowed by this loan)
-        // But practically, the user can assign up to totalStock items to this loan
-        // because originalQty is already part of totalStock
         return totalStock
     }
     
@@ -247,7 +227,6 @@ fun EditLoanScreen(
                             val loan = loanWithItems!!.loan
                             val items = loanWithItems!!.items
                             
-                            // Borrower Info (read-only)
                             Text(
                                 text = loan.namaPeminjam,
                                 fontSize = 24.sp,
@@ -268,7 +247,6 @@ fun EditLoanScreen(
                             
                             Spacer(modifier = Modifier.height(24.dp))
                             
-                            // Edit Deadline Section
                             Text(
                                 text = "Ubah Deadline",
                                 fontSize = 16.sp,
@@ -282,7 +260,6 @@ fun EditLoanScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Date
                                 OutlinedTextField(
                                     value = deadlineDate,
                                     onValueChange = {},
@@ -307,7 +284,6 @@ fun EditLoanScreen(
                                     )
                                 )
                                 
-                                // Time
                                 OutlinedTextField(
                                     value = deadlineTime,
                                     onValueChange = {},
@@ -335,11 +311,9 @@ fun EditLoanScreen(
                             
                             Spacer(modifier = Modifier.height(24.dp))
                             
-                            // Editable Items Section
                             val visibleItems = items.filter { !removedItems.contains(it.id) }
                             val totalItemCount = visibleItems.size + newAddedItems.size
                             
-                            // Header with add button
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -352,7 +326,6 @@ fun EditLoanScreen(
                                     color = StoraBlueDark
                                 )
                                 
-                                // Add item button
                                 TextButton(
                                     onClick = { showAddItemSheet = true }
                                 ) {
@@ -392,7 +365,6 @@ fun EditLoanScreen(
                                             .fillMaxWidth()
                                             .padding(16.dp)
                                     ) {
-                                        // Item info and remove button
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -410,7 +382,6 @@ fun EditLoanScreen(
                                                     fontSize = 12.sp,
                                                     color = textGray
                                                 )
-                                                // Show available stock info
                                                 Text(
                                                     text = "Tersedia: $maxAvailable unit",
                                                     fontSize = 11.sp,
@@ -418,7 +389,6 @@ fun EditLoanScreen(
                                                 )
                                             }
                                             
-                                            // Remove button
                                             IconButton(
                                                 onClick = { removedItems.add(item.id) },
                                                 modifier = Modifier.size(32.dp)
@@ -434,7 +404,6 @@ fun EditLoanScreen(
                                         
                                         Spacer(modifier = Modifier.height(12.dp))
                                         
-                                        // Quantity controls
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -451,7 +420,6 @@ fun EditLoanScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
-                                                // Minus button
                                                 Box(
                                                     modifier = Modifier
                                                         .size(32.dp)
@@ -477,7 +445,6 @@ fun EditLoanScreen(
                                                     )
                                                 }
                                                 
-                                                // Quantity display
                                                 Text(
                                                     text = "$currentQty",
                                                     fontSize = 16.sp,
@@ -487,7 +454,6 @@ fun EditLoanScreen(
                                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                                 )
                                                 
-                                                // Plus button - limited by inventory availability
                                                 Box(
                                                     modifier = Modifier
                                                         .size(32.dp)
@@ -518,14 +484,13 @@ fun EditLoanScreen(
                                 }
                             }
                             
-                            // Display newly added items
                             newAddedItems.forEachIndexed { index, item ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(bottom = 12.dp),
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)), // Light green for new
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
                                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                 ) {
                                     val newItemMaxAvailable = getMaxAvailableQty(item.kodeBarang, 0)
@@ -565,7 +530,6 @@ fun EditLoanScreen(
                                                     fontSize = 12.sp,
                                                     color = textGray
                                                 )
-                                                // Show available stock info
                                                 Text(
                                                     text = "Tersedia: $newItemMaxAvailable unit",
                                                     fontSize = 11.sp,
@@ -588,7 +552,6 @@ fun EditLoanScreen(
                                         
                                         Spacer(modifier = Modifier.height(12.dp))
                                         
-                                        // Quantity controls for new items
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -605,7 +568,6 @@ fun EditLoanScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
-                                                // Minus button
                                                 Box(
                                                     modifier = Modifier
                                                         .size(32.dp)
@@ -619,7 +581,6 @@ fun EditLoanScreen(
                                                             else Color(0xFFBDBDBD), 
                                                             CircleShape)
                                                         .clickable(enabled = item.jumlah > 1) {
-                                                            // Create updated item with decreased quantity
                                                             val updatedItem = item.copy(jumlah = item.jumlah - 1)
                                                             newAddedItems[index] = updatedItem
                                                         },
@@ -633,7 +594,6 @@ fun EditLoanScreen(
                                                     )
                                                 }
                                                 
-                                                // Quantity display
                                                 Text(
                                                     text = "${item.jumlah}",
                                                     fontSize = 16.sp,
@@ -643,7 +603,6 @@ fun EditLoanScreen(
                                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                                 )
                                                 
-                                                // Plus button - limited by inventory availability
                                                 Box(
                                                     modifier = Modifier
                                                         .size(32.dp)
@@ -657,7 +616,6 @@ fun EditLoanScreen(
                                                             else Color(0xFFBDBDBD), 
                                                             CircleShape)
                                                         .clickable(enabled = newItemCanIncrease) {
-                                                            // Create updated item with increased quantity
                                                             val updatedItem = item.copy(jumlah = item.jumlah + 1)
                                                             newAddedItems[index] = updatedItem
                                                         },
@@ -675,7 +633,6 @@ fun EditLoanScreen(
                                         
                                         Spacer(modifier = Modifier.height(12.dp))
                                         
-                                        // Photo upload for new item
                                         Text(
                                             text = "Foto Barang:",
                                             fontSize = 13.sp,
@@ -729,7 +686,6 @@ fun EditLoanScreen(
                                 }
                             }
                             
-                            // Warning if all items removed and no new items
                             if (visibleItems.isEmpty() && newAddedItems.isEmpty()) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
@@ -747,13 +703,10 @@ fun EditLoanScreen(
                             
                             Spacer(modifier = Modifier.height(32.dp))
                             
-                            // Save Button
                             Button(
                                 onClick = {
                                     val newDeadline = "$deadlineDate $deadlineTime"
                                     
-                                    // Build the new items list with modified quantities
-                                    // Only include items that weren't removed
                                     val modifiedItems = items
                                         .filter { !removedItems.contains(it.id) }
                                         .map { item ->
@@ -766,7 +719,6 @@ fun EditLoanScreen(
                                             )
                                         }
                                     
-                                    // Combine existing modified items with newly added items
                                     val allItems = modifiedItems + newAddedItems.toList()
                                     
                                     loanViewModel.updateLoan(
@@ -817,7 +769,6 @@ fun EditLoanScreen(
             }
         }
         
-        // Date Picker
         if (showDatePicker) {
             val datePickerState = rememberDatePickerState()
             DatePickerDialog(
@@ -846,7 +797,6 @@ fun EditLoanScreen(
             }
         }
         
-        // Time Picker
         if (showTimePicker) {
             val timePickerState = rememberTimePickerState(
                 initialHour = calendar.get(java.util.Calendar.HOUR_OF_DAY),
@@ -881,7 +831,6 @@ fun EditLoanScreen(
             )
         }
         
-        // Add Item Bottom Sheet
         if (showAddItemSheet) {
             ModalBottomSheet(
                 onDismissRequest = { 
@@ -906,7 +855,6 @@ fun EditLoanScreen(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Search field
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -924,7 +872,6 @@ fun EditLoanScreen(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Filter inventory items - exclude already added
                     val existingIds = loanWithItems?.items?.map { it.inventarisId } ?: emptyList()
                     val newIds = newAddedItems.map { it.inventarisId }
                     val allAddedIds = existingIds + newIds
@@ -968,7 +915,7 @@ fun EditLoanScreen(
                                                     inventarisId = inventoryItem.serverId ?: 0,
                                                     namaBarang = inventoryItem.name,
                                                     kodeBarang = inventoryItem.noinv,
-                                                    jumlah = 1, // Default qty 1
+                                                    jumlah = 1,
                                                     imageUri = null
                                                 )
                                             )
@@ -1015,7 +962,6 @@ fun EditLoanScreen(
         }
     }
     
-    // Photo picker dialog for new items
     if (showPhotoPickerDialog) {
         AlertDialog(
             onDismissRequest = { 
