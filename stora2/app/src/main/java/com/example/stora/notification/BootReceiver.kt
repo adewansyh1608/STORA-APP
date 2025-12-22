@@ -11,10 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/**
- * BroadcastReceiver that reschedules all reminder alarms after device reboot.
- * This ensures reminders continue to work after device restart.
- */
 class BootReceiver : BroadcastReceiver() {
 
     companion object {
@@ -36,13 +32,11 @@ class BootReceiver : BroadcastReceiver() {
                         return@launch
                     }
                     
-                    // Get all active reminders
                     val reminders = database.reminderDao().getActiveReminders(userId).first()
                     Log.d(TAG, "Found ${reminders.size} active reminders to reschedule")
                     
                     reminders.forEach { reminder ->
                         if (reminder.reminderType == "custom" && reminder.scheduledDatetime != null) {
-                            // Only reschedule if scheduled time is in the future
                             if (reminder.scheduledDatetime > System.currentTimeMillis()) {
                                 ReminderAlarmManager.scheduleExactAlarm(
                                     context = context,
@@ -59,10 +53,8 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     }
                     
-                    // Also restart periodic work
                     ReminderScheduler.schedulePeriodicCheck(context)
                     
-                    // Reschedule loan deadline alarms
                     rescheduleLoanAlarms(context, database, userId)
                     
                     Log.d(TAG, "✓ All reminders and loan alarms rescheduled after boot")
@@ -74,9 +66,6 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
     
-    /**
-     * Reschedule loan deadline alarms for all active loans
-     */
     private suspend fun rescheduleLoanAlarms(
         context: Context,
         database: AppDatabase,
@@ -85,7 +74,6 @@ class BootReceiver : BroadcastReceiver() {
         try {
             val loanDao = database.loanDao()
             
-            // Get all active loans (status = Dipinjam)
             val activeLoans = loanDao.getActiveLoans(userId).first()
             Log.d(TAG, "Found ${activeLoans.size} active loans to reschedule alarms")
             
@@ -93,11 +81,9 @@ class BootReceiver : BroadcastReceiver() {
             
             activeLoans.forEach { loan ->
                 try {
-                    // Parse tanggalKembali to timestamp
                     val deadlineDate = dateFormat.parse(loan.tanggalKembali)
                     val deadlineTimeMillis = deadlineDate?.time ?: return@forEach
                     
-                    // Only schedule if deadline is in the future (with 1hr buffer for overdue notification)
                     val oneHourAfterDeadline = deadlineTimeMillis + (60 * 60 * 1000)
                     if (oneHourAfterDeadline > System.currentTimeMillis()) {
                         ReminderAlarmManager.scheduleLoanAlarms(

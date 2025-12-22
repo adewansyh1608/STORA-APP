@@ -48,7 +48,6 @@ fun SettingScreen(navController: NavHostController) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
             TopAppBar(
                 title = {
                     Text(
@@ -75,7 +74,6 @@ fun SettingScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // White Card Container with Animation
             androidx.compose.animation.AnimatedVisibility(
                 visible = isVisible,
                 enter = slideInVertically(animationSpec = tween(800, delayMillis = 200)) { it } + fadeIn(animationSpec = tween(800, delayMillis = 200)),
@@ -95,7 +93,6 @@ fun SettingScreen(navController: NavHostController) {
                             .padding(24.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                    // Notification Section
                     SettingSectionTitle(title = "Notifikasi")
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -117,7 +114,6 @@ fun SettingScreen(navController: NavHostController) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // About Section
                     SettingSectionTitle(title = "Tentang")
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -126,14 +122,14 @@ fun SettingScreen(navController: NavHostController) {
                         icon = Icons.AutoMirrored.Filled.Help,
                         title = "Bantuan & Dukungan",
                         subtitle = "Dapatkan bantuan atau hubungi kami",
-                        onClick = { /* TODO: Navigate to help */ }
+                        onClick = { }
                     )
 
                     SettingMenuItem(
                         icon = Icons.Default.Info,
                         title = "Tentang Aplikasi",
                         subtitle = "Versi 1.0.0",
-                        onClick = { /* TODO: Show app info */ }
+                        onClick = { }
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))

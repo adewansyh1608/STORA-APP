@@ -84,9 +84,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/**
- * Composable utama untuk HomeScreen
- */
 @Composable
 fun HomeScreen(
     navController: NavHostController,
@@ -102,21 +99,15 @@ fun HomeScreen(
     var isReminderExpanded by rememberSaveable { mutableStateOf(false) }
     val inventoryItems by inventoryViewModel.inventoryItems.collectAsState()
 
-    // State from NotificationViewModel (data from Room database - works offline!)
     val notificationHistory by notificationViewModel.notificationHistory.collectAsState()
     val isLoading by notificationViewModel.isLoading.collectAsState()
     val isOnline by notificationViewModel.isOnline.collectAsState()
 
-    // Load profile and sync notifications on mount
     LaunchedEffect(Unit) {
-        // Reload profile from TokenManager to get latest data
         userProfileViewModel.loadProfileFromToken()
-        
-        // Sync notifications (loads from Room, syncs with server if online)
         notificationViewModel.syncData()
     }
 
-    // Refresh network status periodically
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(5000)
@@ -132,10 +123,8 @@ fun HomeScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
             StoraTopBar(navController = navController, userProfileViewModel = userProfileViewModel)
 
-            // Summary Cards dengan animasi alpha dan offset
             val cardsAlpha by animateFloatAsState(
                 targetValue = if (isReminderExpanded) 0f else 1f,
                 animationSpec = tween(durationMillis = 400),
@@ -159,10 +148,8 @@ fun HomeScreen(
                 }
             }
 
-            // Spacer yang menyesuaikan
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Background putih dengan animasi smooth sweep ke atas
             val sheetOffsetY by animateDpAsState(
                 targetValue = if (isReminderExpanded) (-80).dp else 0.dp,
                 animationSpec = tween(
@@ -186,7 +173,6 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(horizontal = 20.dp)
                 ) {
-                    // Header Reminder
                     item {
                         ReminderHeader(
                             isExpanded = isReminderExpanded,
@@ -195,7 +181,6 @@ fun HomeScreen(
                         )
                     }
 
-                    // Loading indicator
                     if (isLoading) {
                         item {
                             Box(
@@ -208,7 +193,6 @@ fun HomeScreen(
                             }
                         }
                     } else if (notificationHistory.isEmpty()) {
-                        // Empty state with offline indicator
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -241,13 +225,11 @@ fun HomeScreen(
                             }
                         }
                     } else {
-                        // Daftar Item Notification dari Room database (works offline!)
                         items(notificationHistory) { notification ->
                             NotificationHistoryEntityItem(notification = notification)
                         }
                     }
 
-                    // Spacer di bagian bawah
                     item {
                         Spacer(modifier = Modifier.height(100.dp))
                     }
@@ -255,7 +237,6 @@ fun HomeScreen(
             }
         }
 
-        // Bottom Navigation Bar
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -266,9 +247,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Top Bar untuk HomeScreen
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StoraTopBar(navController: NavHostController, userProfileViewModel: UserProfileViewModel) {
@@ -286,7 +264,6 @@ private fun StoraTopBar(navController: NavHostController, userProfileViewModel: 
                 navController.navigate(com.example.stora.navigation.Routes.PROFILE_SCREEN)
             }) {
                 if (userProfile.profileImageUri != null && userProfile.profileImageUri.toString().isNotEmpty()) {
-                    // Tampilkan foto profile
                     AsyncImage(
                         model = userProfile.profileImageUri,
                         contentDescription = "Profile",
@@ -296,7 +273,6 @@ private fun StoraTopBar(navController: NavHostController, userProfileViewModel: 
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Tampilkan icon default
                     Icon(
                         imageVector = Icons.Outlined.AccountCircle,
                         contentDescription = "Profile",
@@ -314,12 +290,8 @@ private fun StoraTopBar(navController: NavHostController, userProfileViewModel: 
     )
 }
 
-/**
- * Dua kartu di bagian atas
- */
 @Composable
 private fun SummaryCardsRow(totalInventory: Int) {
-    // Hitung total barang yang sedang dipinjam
     val totalLoaned = remember(LoansData.loansOnLoan.size) {
         LoansData.loansOnLoan.sumOf { it.quantity }
     }
@@ -398,9 +370,6 @@ private fun SummaryCard(
     }
 }
 
-/**
- * Header "Reminder" yang bisa diklik
- */
 @Composable
 private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit, count: Int = 0) {
     val chevronRotation by animateFloatAsState(
@@ -441,12 +410,8 @@ private fun ReminderHeader(isExpanded: Boolean, onClick: () -> Unit, count: Int 
     }
 }
 
-/**
- * Satu item di dalam daftar Notification History
- */
 @Composable
 private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
-    // Determine if this is a loan deadline notification
     val isLoanNotification = notification.judul?.contains("Deadline") == true || 
                               notification.judul?.contains("Pengembalian") == true ||
                               notification.pesan?.contains("pengembalian") == true ||
@@ -497,7 +462,6 @@ private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
-                // Tampilkan tanggal jika ada
                 notification.tanggal?.let { dateStr ->
                     Text(
                         text = formatNotificationDate(dateStr),
@@ -510,9 +474,6 @@ private fun NotificationHistoryItem(notification: NotificationHistoryApiModel) {
     }
 }
 
-/**
- * Format tanggal notifikasi untuk ditampilkan
- */
 private fun formatNotificationDate(dateStr: String): String {
     return try {
         val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -524,12 +485,8 @@ private fun formatNotificationDate(dateStr: String): String {
     }
 }
 
-/**
- * Satu item untuk NotificationHistoryEntity dari Room database
- */
 @Composable
 private fun NotificationHistoryEntityItem(notification: NotificationHistoryEntity) {
-    // Determine if this is a loan deadline notification
     val isLoanNotification = notification.title?.contains("Deadline") == true || 
                               notification.title?.contains("Pengembalian") == true ||
                               notification.message?.contains("pengembalian") == true ||
@@ -576,7 +533,6 @@ private fun NotificationHistoryEntityItem(notification: NotificationHistoryEntit
                         fontSize = 16.sp,
                         color = if (isLoanNotification) Color(0xFFE65100) else StoraBlueDark
                     )
-                    // Show sync indicator if not synced
                     if (notification.needsSync) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
@@ -592,7 +548,6 @@ private fun NotificationHistoryEntityItem(notification: NotificationHistoryEntit
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
-                // Tampilkan tanggal dari timestamp
                 Text(
                     text = formatNotificationTimestamp(notification.timestamp),
                     fontSize = 12.sp,
@@ -603,9 +558,6 @@ private fun NotificationHistoryEntityItem(notification: NotificationHistoryEntit
     }
 }
 
-/**
- * Format timestamp untuk ditampilkan
- */
 private fun formatNotificationTimestamp(timestamp: Long): String {
     return try {
         val date = Date(timestamp)

@@ -2,8 +2,6 @@ package com.example.stora.data
 
 import com.google.gson.annotations.SerializedName
 
-// ==================== API RESPONSE MODELS ====================
-
 data class LoanApiResponse<T>(
     @SerializedName("success")
     val success: Boolean,
@@ -27,8 +25,6 @@ data class LoanPagination(
     @SerializedName("hasPrev")
     val hasPrev: Boolean
 )
-
-// ==================== API MODEL (from server) ====================
 
 data class LoanApiModel(
     @SerializedName("ID_Peminjaman")
@@ -99,8 +95,6 @@ data class LoanUserApiModel(
     val email: String?
 )
 
-// ==================== API REQUEST MODELS ====================
-
 data class LoanCreateRequest(
     @SerializedName("Nama_Peminjam")
     val namaPeminjam: String,
@@ -139,11 +133,6 @@ data class LoanUpdateRequest(
     val barangList: List<LoanBarangRequest>? = null
 )
 
-// ==================== EXTENSION FUNCTIONS ====================
-
-/**
- * Convert API model to Room entity
- */
 fun LoanApiModel.toLoanEntity(existingId: String? = null, userId: Int): LoanEntity {
     return LoanEntity(
         id = existingId ?: java.util.UUID.randomUUID().toString(),
@@ -160,20 +149,12 @@ fun LoanApiModel.toLoanEntity(existingId: String? = null, userId: Int): LoanEnti
     )
 }
 
-/**
- * Convert API barang model to LoanItemEntity
- * Uses serverId to generate consistent ID for proper sync behavior
- */
 fun LoanBarangApiModel.toLoanItemEntity(loanId: String, baseUrl: String = ""): LoanItemEntity {
-    // Use a consistent ID based on server ID to prevent duplicates on sync
-    // If no serverId, fallback to UUID (for locally created items)
     val itemId = idPeminjamanBarang?.let { "server_item_$it" } 
         ?: java.util.UUID.randomUUID().toString()
     
-    // Get first foto entry for this item (should be one per item now with FK change)
     val fotoItem = foto?.firstOrNull()
     
-    // Build full URL for photos (prepend base URL if not already absolute)
     val borrowPhotoUrl = fotoItem?.fotoPeminjaman?.let { 
         if (it.startsWith("http")) it else "$baseUrl$it"
     }
@@ -194,9 +175,6 @@ fun LoanBarangApiModel.toLoanItemEntity(loanId: String, baseUrl: String = ""): L
     )
 }
 
-/**
- * Convert LoanEntity to API request
- */
 fun LoanEntity.toApiRequest(items: List<LoanItemEntity>): LoanCreateRequest {
     return LoanCreateRequest(
         namaPeminjam = namaPeminjam,
@@ -215,25 +193,20 @@ fun LoanEntity.toApiRequest(items: List<LoanItemEntity>): LoanCreateRequest {
     )
 }
 
-/**
- * Convert date from dd/MM/yyyy or dd/MM/yyyy HH:mm to yyyy-MM-dd or yyyy-MM-dd HH:mm:ss (ISO format for API)
- */
 private fun convertDateFormat(date: String): String {
     return try {
         if (date.contains(":")) {
-            // DateTime format: dd/MM/yyyy HH:mm -> yyyy-MM-dd HH:mm:ss
             val inputFormat = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
             val outputFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
             val parsedDate = inputFormat.parse(date)
             parsedDate?.let { outputFormat.format(it) } ?: date
         } else {
-            // Date only format: dd/MM/yyyy -> yyyy-MM-dd
             val inputFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
             val outputFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
             val parsedDate = inputFormat.parse(date)
             parsedDate?.let { outputFormat.format(it) } ?: date
         }
     } catch (e: Exception) {
-        date // Return original if parsing fails
+        date
     }
 }

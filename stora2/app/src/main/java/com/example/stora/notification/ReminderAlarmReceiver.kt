@@ -19,11 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-/**
- * BroadcastReceiver for handling reminder alarms.
- * This fires even when the app is closed, allowing offline notifications to show.
- * ALWAYS shows notification when triggered - deduplication is handled by FCM service.
- */
 class ReminderAlarmReceiver : BroadcastReceiver() {
 
     companion object {
@@ -55,13 +50,8 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         Log.d(TAG, "Reminder: id=$reminderId, title=$reminderTitle, type=$reminderType")
         Log.d(TAG, "Scheduled time: $scheduledTime (${java.util.Date(scheduledTime)})")
         
-        // ALWAYS show notification - don't check network status here
-        // Deduplication is handled by FCM service when it receives push
-        
-        // Show notification immediately on main thread
         showNotification(context, reminderId, reminderTitle, reminderType)
         
-        // Save to database in background
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val database = AppDatabase.getDatabase(context)
@@ -73,7 +63,6 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // Check for existing notification (deduplication)
                 val calendar = Calendar.getInstance()
                 calendar.timeInMillis = scheduledTime
                 calendar.set(Calendar.HOUR_OF_DAY, 0)
@@ -93,15 +82,13 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // Standardized message format
                 val message = "Waktu pengingat: $reminderTitle"
                 
-                // Save to Room database with LOCAL timestamp (not scheduled time)
                 val notification = NotificationHistoryEntity.createLocal(
                     userId = userId,
                     title = reminderTitle,
                     message = message,
-                    timestamp = System.currentTimeMillis(), // Use current time, not scheduled
+                    timestamp = System.currentTimeMillis(),
                     relatedReminderId = reminderId,
                     serverReminderId = if (serverReminderId != -1) serverReminderId else null
                 )
@@ -109,10 +96,8 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
                 database.notificationHistoryDao().insertNotification(notification)
                 Log.d(TAG, "✓ Notification history saved: $reminderTitle at ${java.util.Date(notification.timestamp)}")
                 
-                // Update reminder's last notified timestamp
                 database.reminderDao().updateLastNotified(reminderId, System.currentTimeMillis())
                 
-                // Delete the custom reminder (one-time) after notification
                 if (reminderType == "custom") {
                     database.reminderDao().deleteReminder(reminderId)
                     Log.d(TAG, "✓ Custom reminder deleted after notification")
@@ -127,7 +112,6 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
     private fun showNotification(context: Context, reminderId: String, title: String, type: String) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
-        // Create notification channel for Android 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -143,7 +127,6 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
         
-        // Create intent to open app
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("from_notification", true)
@@ -157,7 +140,6 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Standardized message format
         val message = "Waktu pengingat: $title"
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -178,4 +160,3 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         Log.d(TAG, "✓ Notification shown: $title (id=$notificationId)")
     }
 }
-

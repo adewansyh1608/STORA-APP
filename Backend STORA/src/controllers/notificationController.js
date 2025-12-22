@@ -3,7 +3,6 @@ const { sendPushNotification } = require('../services/firebaseAdmin');
 const { validationResult } = require('express-validator');
 
 class NotificationController {
-    // Register FCM token for a user (supports multiple devices)
     async registerToken(req, res) {
         try {
             const { fcm_token, device_name } = req.body;
@@ -16,20 +15,17 @@ class NotificationController {
                 });
             }
 
-            // Find existing device entry for this user with this token
             const existingDevice = await UserDevice.findOne({
                 where: { ID_User: userId, FCM_Token: fcm_token }
             });
 
             if (existingDevice) {
-                // Update existing device
                 await existingDevice.update({
                     Device_Name: device_name || existingDevice.Device_Name || 'Unknown Device',
                     Last_Active: new Date(),
                     Is_Active: true,
                 });
             } else {
-                // Create new device entry
                 await UserDevice.create({
                     ID_User: userId,
                     FCM_Token: fcm_token,
@@ -39,13 +35,11 @@ class NotificationController {
                 });
             }
 
-            // Also update User's FCM_Token for backward compatibility (used by loan reminders)
             await User.update(
                 { FCM_Token: fcm_token },
                 { where: { ID_User: userId } }
             );
 
-            // Update all active reminders for this user to use the new token
             await ReminderSetting.update(
                 { fcm_token },
                 { where: { ID_User: userId, is_active: true } }
@@ -66,7 +60,6 @@ class NotificationController {
         }
     }
 
-    // Get all reminders for current user
     async getReminders(req, res) {
         try {
             const userId = req.user.id;
@@ -76,18 +69,14 @@ class NotificationController {
                 order: [['created_at', 'DESC']],
             });
 
-            // Transform data to return scheduled_datetime as timestamp (milliseconds)
-            // This ensures consistent time handling across different timezones
             const transformedReminders = reminders.map(reminder => {
                 const plainReminder = reminder.toJSON();
 
-                // Convert scheduled_datetime to timestamp if it exists
                 if (plainReminder.scheduled_datetime) {
                     const dateObj = new Date(plainReminder.scheduled_datetime);
                     plainReminder.scheduled_datetime = dateObj.getTime().toString();
                 }
 
-                // Also convert last_notified to timestamp
                 if (plainReminder.last_notified) {
                     const dateObj = new Date(plainReminder.last_notified);
                     plainReminder.last_notified = dateObj.getTime().toString();
@@ -109,7 +98,6 @@ class NotificationController {
         }
     }
 
-    // Create or update reminder (upsert for periodic)
     async createReminder(req, res) {
         try {
             const errors = validationResult(req);
@@ -124,7 +112,6 @@ class NotificationController {
             const userId = req.user.id;
             const { reminder_type, title, periodic_months, scheduled_datetime, fcm_token } = req.body;
 
-            // Validate based on reminder type
             if (reminder_type === 'periodic' && (!periodic_months || periodic_months < 1 || periodic_months > 12)) {
                 return res.status(400).json({
                     success: false,
@@ -139,7 +126,6 @@ class NotificationController {
                 });
             }
 
-            // For PERIODIC reminders: Check if user already has one, then UPDATE instead of CREATE
             if (reminder_type === 'periodic') {
                 const existingPeriodicReminder = await ReminderSetting.findOne({
                     where: {
@@ -149,13 +135,12 @@ class NotificationController {
                 });
 
                 if (existingPeriodicReminder) {
-                    // UPDATE existing periodic reminder
                     await existingPeriodicReminder.update({
                         title: title || 'Pengingat Pengecekan Inventory',
                         periodic_months: periodic_months || 3,
                         fcm_token: fcm_token || existingPeriodicReminder.fcm_token,
                         is_active: true,
-                        last_notified: new Date(), // Reset countdown from now
+                        last_notified: new Date(),
                     });
 
                     console.log(`✓ Periodic reminder updated: ${existingPeriodicReminder.ID_Reminder} for user ${userId}, months: ${periodic_months}`);
@@ -168,22 +153,16 @@ class NotificationController {
                 }
             }
 
-            // CREATE new reminder (for custom, or if no periodic exists)
-            // Handle scheduled_datetime - can be timestamp (number) or date string
             let parsedDatetime = null;
             if (reminder_type === 'custom' && scheduled_datetime) {
-                // Check if it's a numeric timestamp (milliseconds)
                 const numericValue = parseInt(scheduled_datetime, 10);
                 if (!isNaN(numericValue) && numericValue > 1000000000000) {
-                    // Milliseconds timestamp
                     parsedDatetime = new Date(numericValue);
                     console.log(`Parsed timestamp (ms): ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
                 } else if (!isNaN(numericValue) && numericValue > 1000000000) {
-                    // Seconds timestamp
                     parsedDatetime = new Date(numericValue * 1000);
                     console.log(`Parsed timestamp (s): ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
                 } else {
-                    // Date string
                     parsedDatetime = new Date(scheduled_datetime);
                     console.log(`Parsed date string: ${scheduled_datetime} -> ${parsedDatetime.toISOString()}`);
                 }
@@ -218,7 +197,6 @@ class NotificationController {
         }
     }
 
-    // Update reminder
     async updateReminder(req, res) {
         try {
             const { id } = req.params;
@@ -236,12 +214,10 @@ class NotificationController {
                 });
             }
 
-            // If updating periodic_months, reset last_notified to start countdown from now
             if (updateData.periodic_months && reminder.reminder_type === 'periodic') {
                 updateData.last_notified = new Date();
             }
 
-            // Update the reminder
             await reminder.update(updateData);
 
             res.status(200).json({
@@ -258,7 +234,6 @@ class NotificationController {
         }
     }
 
-    // Delete reminder
     async deleteReminder(req, res) {
         try {
             const { id } = req.params;
@@ -288,7 +263,6 @@ class NotificationController {
         }
     }
 
-    // Toggle reminder active status
     async toggleReminder(req, res) {
         try {
             const { id } = req.params;
@@ -321,7 +295,6 @@ class NotificationController {
         }
     }
 
-    // Get notification history for current user
     async getNotificationHistory(req, res) {
         try {
             const userId = req.user.id;
@@ -345,16 +318,13 @@ class NotificationController {
         }
     }
 
-    // Create notification history entry (for syncing local notifications to server)
     async createNotificationHistory(req, res) {
         try {
             const userId = req.user.id;
             const { Judul, Pesan, Tanggal, Status, ID_Reminder, timestamp } = req.body;
 
-            // Handle timestamp - can be milliseconds timestamp or date string
             let parsedDate;
             if (timestamp) {
-                // If timestamp (milliseconds) is provided, use it
                 const numericValue = parseInt(timestamp, 10);
                 if (!isNaN(numericValue) && numericValue > 1000000000000) {
                     parsedDate = new Date(numericValue);
@@ -371,7 +341,6 @@ class NotificationController {
 
             console.log(`Creating notification: Judul=${Judul}, timestamp=${timestamp}, parsedDate=${parsedDate.toISOString()}`);
 
-            // Check for existing notification with same reminder on same day (deduplication)
             if (ID_Reminder) {
                 const startOfDay = new Date(parsedDate);
                 startOfDay.setHours(0, 0, 0, 0);
@@ -403,8 +372,8 @@ class NotificationController {
                 ID_User: userId,
                 Judul: Judul || 'Notifikasi',
                 Pesan: Pesan || '',
-                Tanggal: parsedDate, // Now stores full datetime
-                Status: 'Terkirim', // Standardized status
+                Tanggal: parsedDate,
+                Status: 'Terkirim',
                 ID_Reminder: ID_Reminder || null,
                 isSynced: true,
             });
@@ -427,4 +396,3 @@ class NotificationController {
 }
 
 module.exports = new NotificationController();
-

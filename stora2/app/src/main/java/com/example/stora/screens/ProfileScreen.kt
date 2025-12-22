@@ -52,13 +52,11 @@ fun ProfileScreen(
     var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        // Reload profile from TokenManager to get latest data
         viewModel.loadProfileFromToken()
         delay(100)
         isVisible = true
     }
 
-    // Navigate to auth screen after successful logout
     LaunchedEffect(authState.isLoggedIn) {
         if (!authState.isLoggedIn && showLogoutDialog) {
             navController.navigate(Routes.AUTH_SCREEN) {
@@ -74,14 +72,13 @@ fun ProfileScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
             TopAppBar(
                 title = {
                     Text(
                         text = "Profile",
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = Color(0xFFFFA726) // Orange color
+                        color = Color(0xFFFFA726)
                     )
                 },
                 navigationIcon = {
@@ -101,13 +98,11 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(80.dp))
 
-            // White Card Container with overlapping avatar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // White Card with Animation
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isVisible,
                     enter = slideInVertically(animationSpec = tween(800, delayMillis = 200)) { it } + fadeIn(
@@ -118,7 +113,7 @@ fun ProfileScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 60.dp), // Space for half of avatar
+                            .padding(top = 60.dp),
                         color = Color.White,
                         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
                         shadowElevation = 8.dp
@@ -129,13 +124,10 @@ fun ProfileScreen(
                                 .padding(horizontal = 24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Space for avatar overlap
                             Spacer(modifier = Modifier.height(70.dp))
 
-                            // Additional space between avatar and name
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // User Name
                             Text(
                                 text = userProfile.name,
                                 fontSize = 20.sp,
@@ -145,7 +137,6 @@ fun ProfileScreen(
 
                             Spacer(modifier = Modifier.height(40.dp))
 
-                            // Menu Items
                             ProfileMenuItem(
                                 icon = Icons.Default.Person,
                                 text = "Edit Profile",
@@ -171,7 +162,6 @@ fun ProfileScreen(
                     }
                 }
 
-                // Profile Avatar - positioned to overlap
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -182,7 +172,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .size(120.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFFFA726)), // Orange background
+                            .background(Color(0xFFFFA726)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (userProfile.profileImageUri != null && userProfile.profileImageUri.toString().isNotEmpty()) {
@@ -205,14 +195,11 @@ fun ProfileScreen(
             }
         }
 
-        // Logout Confirmation Dialog with Bottom Sheet Animation
         if (showLogoutDialog) {
             LogoutConfirmationDialog(
                 onDismiss = { showLogoutDialog = false },
                 onConfirm = {
-                    // Call logout from AuthViewModel
                     authViewModel.logout()
-                    // Navigation will happen in LaunchedEffect after logout completes
                 }
             )
         }
@@ -236,7 +223,7 @@ private fun ProfileMenuItem(
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF2196F3)), // Blue background
+                .background(Color(0xFF2196F3)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -280,7 +267,6 @@ private fun LogoutConfirmationDialog(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Icon
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -298,7 +284,6 @@ private fun LogoutConfirmationDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Title
             Text(
                 text = "Keluar dari Akun?",
                 fontSize = 24.sp,
@@ -308,7 +293,6 @@ private fun LogoutConfirmationDialog(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Description
             Text(
                 text = "Apakah Anda yakin ingin keluar dari akun Anda?",
                 fontSize = 16.sp,
@@ -317,12 +301,10 @@ private fun LogoutConfirmationDialog(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Cancel Button
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier
@@ -340,7 +322,6 @@ private fun LogoutConfirmationDialog(
                     )
                 }
 
-                // Confirm Button
                 Button(
                     onClick = onConfirm,
                     modifier = Modifier

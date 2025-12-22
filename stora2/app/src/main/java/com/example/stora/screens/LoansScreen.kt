@@ -66,26 +66,22 @@ fun LoansScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // ViewModel states
     val isSyncing by loanViewModel.isSyncing.collectAsState()
     val syncStatus by loanViewModel.syncStatus.collectAsState()
     val unsyncedCount by loanViewModel.unsyncedCount.collectAsState()
     val error by loanViewModel.error.collectAsState()
     val isServerAvailable by loanViewModel.isServerAvailable.collectAsState()
     
-    // Use server availability instead of just network check
     val isActuallyOnline = loanViewModel.isOnline() && isServerAvailable
 
     val textGray = Color(0xFF585858)
     val dividerYellow = Color(0xFFEFBF6A)
     
-    // Check for delete result from previous screen
     val deleteResult = navController.currentBackStackEntry
         ?.savedStateHandle
         ?.getLiveData<Boolean>("history_deleted")
         ?.value
     
-    // Show snackbar when delete result is received
     LaunchedEffect(deleteResult) {
         if (deleteResult == true) {
             scope.launch {
@@ -94,7 +90,6 @@ fun LoansScreen(
                     duration = SnackbarDuration.Short,
                     withDismissAction = true
                 )
-                // Clear the result after snackbar is shown
                 navController.currentBackStackEntry
                     ?.savedStateHandle
                     ?.set("history_deleted", false)
@@ -102,7 +97,6 @@ fun LoansScreen(
         }
     }
 
-    // Show snackbar for sync status
     LaunchedEffect(syncStatus) {
         syncStatus?.let {
             snackbarHostState.showSnackbar(
@@ -112,7 +106,6 @@ fun LoansScreen(
         }
     }
 
-    // Show snackbar for errors
     LaunchedEffect(error) {
         error?.let {
             snackbarHostState.showSnackbar(
@@ -123,7 +116,6 @@ fun LoansScreen(
         }
     }
 
-    // Filter items berdasarkan tab yang dipilih
     val currentItems = if (selectedTab == 0) LoansData.loansOnLoan else LoansData.loansHistory
 
     val filteredItems = remember(searchQuery, currentItems, currentItems.size) {
@@ -138,7 +130,6 @@ fun LoansScreen(
         }
     }
     
-    // Group items by groupId and create aggregated display items
     val groupedItems = remember(filteredItems) {
         filteredItems
             .groupBy { it.groupId }
@@ -171,9 +162,9 @@ fun LoansScreen(
                             snackbarData.visuals.message.contains("failed", ignoreCase = true)
 
                     val backgroundColor = when {
-                        isSuccess -> Color(0xFF00C853) // Green
-                        isError -> Color(0xFFE53935) // Red
-                        else -> Color(0xFF1976D2) // Blue
+                        isSuccess -> Color(0xFF00C853)
+                        isError -> Color(0xFFE53935)
+                        else -> Color(0xFF1976D2)
                     }
 
                     val icon = when {
@@ -220,7 +211,6 @@ fun LoansScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Sync button - ALWAYS visible with different states
                 BadgedBox(
                     badge = {
                         if (unsyncedCount > 0) {
@@ -243,9 +233,9 @@ fun LoansScreen(
                             }
                         },
                         containerColor = when {
-                            isActuallyOnline && unsyncedCount == 0 -> Color(0xFF4CAF50) // Green - synced
-                            isActuallyOnline && unsyncedCount > 0 -> StoraYellow // Yellow - needs sync
-                            else -> Color.Gray // Gray - offline
+                            isActuallyOnline && unsyncedCount == 0 -> Color(0xFF4CAF50)
+                            isActuallyOnline && unsyncedCount > 0 -> StoraYellow
+                            else -> Color.Gray
                         },
                         contentColor = StoraWhite,
                         modifier = Modifier.size(48.dp)
@@ -274,7 +264,6 @@ fun LoansScreen(
                     }
                 }
 
-                // Add loan button
                 FloatingActionButton(
                     onClick = { navController.navigate(Routes.NEW_LOAN_SCREEN) },
                     containerColor = StoraYellowButton,
@@ -296,7 +285,6 @@ fun LoansScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Title with online/offline indicator
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -311,7 +299,6 @@ fun LoansScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Online/Offline indicator
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -330,7 +317,6 @@ fun LoansScreen(
                 }
             }
 
-            // Tab Selector
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -351,7 +337,6 @@ fun LoansScreen(
                 )
             }
 
-            // Search Bar
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -388,7 +373,6 @@ fun LoansScreen(
                 color = dividerYellow
             )
 
-            // Content
             if (currentItems.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -430,7 +414,6 @@ fun LoansScreen(
                             enter = fadeIn(animationSpec = tween(500)) + slideInVertically(initialOffsetY = { it / 2 })
                         ) {
                             LoanGroupCard(groupedItem = groupedItem, isHistory = selectedTab == 1) {
-                                // Navigate to detail screen with roomLoanId to load from Room
                                 groupedItem.roomLoanId?.let { roomId ->
                                     if (selectedTab == 1) {
                                         navController.navigate(Routes.detailLoanHistoryScreen(roomId))
@@ -483,15 +466,14 @@ fun LoanGroupCard(
 ) {
     val textGray = Color(0xFF585858)
     
-    // Determine status color for history items
     val statusColor = if (isHistory) {
         when (groupedItem.status) {
-            "Selesai" -> Color(0xFF4CAF50) // Green for on-time
-            "Terlambat" -> Color(0xFFE53935) // Red for late
-            else -> Color(0xFF4CAF50) // Default green
+            "Selesai" -> Color(0xFF4CAF50)
+            "Terlambat" -> Color(0xFFE53935)
+            else -> Color(0xFF4CAF50)
         }
     } else {
-        StoraYellowButton // Yellow for active loans
+        StoraYellowButton
     }
     
     val statusText = if (isHistory) {
@@ -511,7 +493,6 @@ fun LoanGroupCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            // Left colored bar
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -519,20 +500,17 @@ fun LoanGroupCard(
                     .background(statusColor)
             )
 
-            // Content
             Column(
                 modifier = Modifier
                     .padding(12.dp)
                     .weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
-                // Row with borrower name and status badge
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Nama Peminjam
                     Text(
                         text = groupedItem.borrower ?: "-",
                         fontWeight = FontWeight.Bold,
@@ -541,7 +519,6 @@ fun LoanGroupCard(
                         modifier = Modifier.weight(1f)
                     )
                     
-                    // Status badge for history
                     if (isHistory && statusText != null) {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
@@ -560,7 +537,6 @@ fun LoanGroupCard(
                 
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Tanggal Peminjaman
                 Text(
                     text = groupedItem.borrowDate ?: "-",
                     color = textGray,
@@ -568,7 +544,6 @@ fun LoanGroupCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Total Jumlah Barang
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Filled.Widgets,

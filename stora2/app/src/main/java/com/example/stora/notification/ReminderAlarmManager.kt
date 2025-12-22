@@ -7,17 +7,9 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 
-/**
- * Utility object for managing exact alarms for reminders.
- * Uses AlarmManager to schedule notifications even when app is closed.
- */
 object ReminderAlarmManager {
     private const val TAG = "ReminderAlarmManager"
     
-    /**
-     * Schedule an exact alarm for a reminder.
-     * The alarm will fire even when the app is closed.
-     */
     fun scheduleExactAlarm(
         context: Context,
         reminderId: String,
@@ -28,11 +20,9 @@ object ReminderAlarmManager {
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         
-        // Check if we can schedule exact alarms (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
                 Log.w(TAG, "Cannot schedule exact alarms - permission not granted")
-                // Fall back to WorkManager (already handled by ReminderScheduler)
                 return
             }
         }
@@ -52,7 +42,6 @@ object ReminderAlarmManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Schedule the alarm
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
@@ -73,13 +62,9 @@ object ReminderAlarmManager {
             
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException scheduling alarm - falling back to WorkManager", e)
-            // WorkManager will handle this as backup
         }
     }
     
-    /**
-     * Cancel a scheduled alarm for a reminder.
-     */
     fun cancelAlarm(context: Context, reminderId: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         
@@ -95,9 +80,6 @@ object ReminderAlarmManager {
         Log.d(TAG, "✓ Alarm cancelled for reminder $reminderId")
     }
     
-    /**
-     * Check if an alarm is currently scheduled for a reminder.
-     */
     fun isAlarmScheduled(context: Context, reminderId: String): Boolean {
         val intent = Intent(context, ReminderAlarmReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -109,15 +91,6 @@ object ReminderAlarmManager {
         return pendingIntent != null
     }
     
-    // ==================== LOAN ALARM METHODS ====================
-    
-    /**
-     * Schedule 3 alarms for a loan: 1 hour before, at deadline, 1 hour after.
-     * @param loanId Local loan ID (String UUID)
-     * @param loanServerId Server loan ID (Int)
-     * @param borrowerName Name of the borrower
-     * @param deadlineTimeMillis Deadline timestamp in milliseconds
-     */
     fun scheduleLoanAlarms(
         context: Context,
         loanId: String,
@@ -127,7 +100,6 @@ object ReminderAlarmManager {
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         
-        // Check if we can schedule exact alarms (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
                 Log.w(TAG, "Cannot schedule exact alarms for loans - permission not granted")
@@ -137,12 +109,10 @@ object ReminderAlarmManager {
         
         val currentTime = System.currentTimeMillis()
         
-        // Calculate the 3 notification times
         val oneHourBefore = deadlineTimeMillis - (60 * 60 * 1000)
         val atDeadline = deadlineTimeMillis
         val oneHourAfter = deadlineTimeMillis + (60 * 60 * 1000)
         
-        // Schedule each alarm if it's in the future
         if (oneHourBefore > currentTime) {
             scheduleLoanAlarm(context, alarmManager, loanId, loanServerId, borrowerName, oneHourBefore, LoanAlarmReceiver.TYPE_WARNING)
         }
@@ -175,7 +145,6 @@ object ReminderAlarmManager {
             putExtra(LoanAlarmReceiver.EXTRA_SCHEDULED_TIME, scheduledTimeMillis)
         }
         
-        // Use unique request code based on loan ID and notification type
         val requestCode = (loanId.hashCode() + notificationType.hashCode()) and 0x7FFFFFFF
         
         val pendingIntent = PendingIntent.getBroadcast(
@@ -208,9 +177,6 @@ object ReminderAlarmManager {
         }
     }
     
-    /**
-     * Cancel all 3 alarms for a loan.
-     */
     fun cancelLoanAlarms(context: Context, loanId: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         

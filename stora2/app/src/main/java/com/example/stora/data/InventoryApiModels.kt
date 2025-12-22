@@ -2,7 +2,6 @@ package com.example.stora.data
 
 import com.google.gson.annotations.SerializedName
 
-// Response wrapper dari backend
 data class InventoryApiResponse<T>(
     @SerializedName("success")
     val success: Boolean,
@@ -14,7 +13,6 @@ data class InventoryApiResponse<T>(
     val pagination: PaginationData?
 )
 
-// Data pagination
 data class PaginationData(
     @SerializedName("currentPage")
     val currentPage: Int,
@@ -28,7 +26,6 @@ data class PaginationData(
     val hasPrev: Boolean
 )
 
-// Model inventory dari API (sesuai dengan backend)
 data class InventoryApiModel(
     @SerializedName("ID_Inventaris")
     val idInventaris: Int?,
@@ -62,7 +59,6 @@ data class InventoryApiModel(
     val foto: List<FotoData>?
 )
 
-// User data dari API
 data class InventoryUserData(
     @SerializedName("ID_User")
     val idUser: Int,
@@ -72,7 +68,6 @@ data class InventoryUserData(
     val email: String?
 )
 
-// Foto data dari API
 data class FotoData(
     @SerializedName("ID_Foto_Inventaris")
     val idFoto: Int,
@@ -80,7 +75,6 @@ data class FotoData(
     val foto: String
 )
 
-// Request untuk create/update inventory
 data class InventoryRequest(
     @SerializedName("Nama_Barang")
     val namaBarang: String,
@@ -102,9 +96,7 @@ data class InventoryRequest(
     val idUser: Int? = null
 )
 
-// Extension functions untuk konversi antara InventoryItem dan InventoryApiModel
 fun InventoryItem.toApiRequest(userId: Int): InventoryRequest {
-    // Convert date from "dd/MM/yyyy" to "yyyy-MM-dd" format
     val apiDate = try {
         val parts = this.date.split("/")
         if (parts.size == 3) {
@@ -125,12 +117,11 @@ fun InventoryItem.toApiRequest(userId: Int): InventoryRequest {
         kondisi = this.condition,
         tanggalPengadaan = apiDate,
         deskripsi = this.description,
-        idUser = userId // Use real user ID from token
+        idUser = userId
     )
 }
 
 fun InventoryApiModel.toInventoryItem(localId: String? = null, userId: Int): InventoryItem {
-    // Construct full photo URL if the path is relative (from server)
     val fullPhotoUrl = this.foto?.firstOrNull()?.foto?.let { photoPath ->
         if (photoPath.startsWith("/uploads/")) {
             "${com.example.stora.network.ApiConfig.SERVER_URL}$photoPath"
@@ -147,7 +138,7 @@ fun InventoryApiModel.toInventoryItem(localId: String? = null, userId: Int): Inv
         category = this.kategori,
         condition = this.kondisi,
         location = this.lokasi,
-        description = this.deskripsi ?: "", // Get description from backend
+        description = this.deskripsi ?: "",
         date = this.tanggalPengadaan,
         photoUri = fullPhotoUrl,
         serverId = this.idInventaris,
@@ -159,13 +150,11 @@ fun InventoryApiModel.toInventoryItem(localId: String? = null, userId: Int): Inv
     )
 }
 
-// Batch sync request
 data class BatchSyncRequest(
     @SerializedName("items")
     val items: List<InventoryRequest>
 )
 
-// Batch sync response
 data class BatchSyncResponse(
     @SerializedName("success")
     val success: Boolean,

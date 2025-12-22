@@ -3,7 +3,6 @@ const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
 class UserController {
-  // Get all users
   async getAllUsers(req, res) {
     try {
       const { page = 1, limit = 10, search = '' } = req.query;
@@ -46,7 +45,6 @@ class UserController {
     }
   }
 
-  // Get user by ID
   async getUserById(req, res) {
     try {
       const { id } = req.params;
@@ -63,7 +61,7 @@ class UserController {
           }
         ]
       });
-      
+
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -83,7 +81,6 @@ class UserController {
     }
   }
 
-  // Create new user
   async createUser(req, res) {
     try {
       const errors = validationResult(req);
@@ -97,7 +94,7 @@ class UserController {
 
       const userData = req.body;
       const newUser = await User.create(userData);
-      
+
       res.status(201).json({
         success: true,
         message: 'User created successfully',
@@ -110,7 +107,7 @@ class UserController {
           message: 'Email already exists'
         });
       }
-      
+
       res.status(500).json({
         success: false,
         message: error.message
@@ -118,16 +115,15 @@ class UserController {
     }
   }
 
-  // Update user
   async updateUser(req, res) {
     try {
       const { id } = req.params;
       const updateData = req.body;
-      
+
       const [updatedRowsCount] = await User.update(updateData, {
         where: { ID_User: id }
       });
-      
+
       if (updatedRowsCount === 0) {
         return res.status(404).json({
           success: false,
@@ -152,7 +148,6 @@ class UserController {
     }
   }
 
-  // Delete user (soft delete by setting isActive to false)
   async deleteUser(req, res) {
     try {
       const { id } = req.params;
@@ -160,7 +155,7 @@ class UserController {
         { isLoggedIn: false },
         { where: { ID_User: id } }
       );
-      
+
       if (updatedRowsCount === 0) {
         return res.status(404).json({
           success: false,
@@ -180,12 +175,11 @@ class UserController {
     }
   }
 
-  // Login user
   async loginUser(req, res) {
     try {
       const { Email, Password } = req.body;
-      
-      const user = await User.findOne({ 
+
+      const user = await User.findOne({
         where: { Email },
         attributes: ['ID_User', 'Nama_User', 'Email', 'Password', 'isLoggedIn']
       });
@@ -205,7 +199,6 @@ class UserController {
         });
       }
 
-      // Update login status
       await user.update({ isLoggedIn: true });
 
       res.status(200).json({

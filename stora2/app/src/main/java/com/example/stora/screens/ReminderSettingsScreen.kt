@@ -54,7 +54,6 @@ fun ReminderSettingsScreen(
     val apiService = ApiConfig.provideApiService()
     val tokenManager = TokenManager.getInstance(context)
 
-    // Collect state from ViewModel (data from Room database)
     val reminders by viewModel.reminders.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
@@ -65,7 +64,6 @@ fun ReminderSettingsScreen(
     var showCustomDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Permission launcher for notifications
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -76,7 +74,6 @@ fun ReminderSettingsScreen(
         }
     }
 
-    // Check and request notification permission
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
@@ -89,20 +86,17 @@ fun ReminderSettingsScreen(
         }
     }
 
-    // Get FCM token and register
     LaunchedEffect(Unit) {
         try {
             val token = FirebaseMessaging.getInstance().token.await()
             fcmToken = token
             Log.d("ReminderSettings", "FCM Token: $token")
 
-            // Save token to SharedPreferences
             context.getSharedPreferences("fcm_prefs", Context.MODE_PRIVATE)
                 .edit()
                 .putString("fcm_token", token)
                 .apply()
 
-            // Register token with backend (only if online)
             val authHeader = tokenManager.getAuthHeader()
             if (authHeader != null) {
                 try {
@@ -116,12 +110,10 @@ fun ReminderSettingsScreen(
         }
     }
 
-    // Sync on screen load
     LaunchedEffect(Unit) {
         viewModel.syncData()
     }
 
-    // Refresh network status periodically
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(5000)
@@ -129,7 +121,6 @@ fun ReminderSettingsScreen(
         }
     }
 
-    // Create or update periodic reminder using ViewModel (works offline!)
     fun createPeriodicReminder(months: Int) {
         viewModel.savePeriodicReminder(
             months = months,
@@ -144,9 +135,7 @@ fun ReminderSettingsScreen(
         showPeriodicDialog = false
     }
 
-    // Create custom reminder using ViewModel (works offline!)
     fun createCustomReminder(datetime: String, title: String) {
-        // Parse datetime string to timestamp
         val timestamp = try {
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
             sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -169,7 +158,6 @@ fun ReminderSettingsScreen(
         showCustomDialog = false
     }
 
-    // Delete reminder using ViewModel (works offline!)
     fun deleteReminder(id: String) {
         viewModel.deleteReminder(
             id = id,
@@ -182,7 +170,6 @@ fun ReminderSettingsScreen(
         )
     }
 
-    // Toggle reminder using ViewModel (works offline!)
     fun toggleReminder(reminder: ReminderEntity) {
         viewModel.toggleReminder(
             reminder = reminder,
@@ -200,7 +187,6 @@ fun ReminderSettingsScreen(
             .background(StoraBlueDark)
             .statusBarsPadding()
     ) {
-        // Top Bar with proper back navigation
         TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -210,7 +196,6 @@ fun ReminderSettingsScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    // Show offline indicator
                     if (!isOnline) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
@@ -236,7 +221,6 @@ fun ReminderSettingsScreen(
             )
         )
 
-        // Content
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -257,10 +241,8 @@ fun ReminderSettingsScreen(
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Check if periodic reminder already exists
                     val existingPeriodicReminder = reminders.find { it.reminderType == "periodic" }
 
-                    // Action buttons
                     item {
                         Text(
                             text = if (existingPeriodicReminder != null) "Pengaturan Pengingat" else "Buat Pengingat Baru",
@@ -297,7 +279,6 @@ fun ReminderSettingsScreen(
                             }
                         }
 
-                        // Show current periodic setting if exists
                         if (existingPeriodicReminder != null) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(
@@ -326,7 +307,6 @@ fun ReminderSettingsScreen(
                         }
                     }
 
-                    // Reminders list
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -376,7 +356,6 @@ fun ReminderSettingsScreen(
         }
     }
 
-    // Periodic Dialog
     if (showPeriodicDialog) {
         val existingPeriodicReminder = reminders.find { it.reminderType == "periodic" }
         PeriodicReminderDialog(
@@ -387,7 +366,6 @@ fun ReminderSettingsScreen(
         )
     }
 
-    // Custom Dialog
     if (showCustomDialog) {
         CustomReminderDialog(
             onDismiss = { showCustomDialog = false },
@@ -431,7 +409,6 @@ fun ReminderCardEntity(
                         fontWeight = FontWeight.Bold,
                         color = if (reminder.isActive) StoraBlueDark else Color.Gray
                     )
-                    // Show sync status indicator
                     if (reminder.needsSync) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
@@ -643,7 +620,6 @@ fun CustomReminderDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Date selection
                 OutlinedButton(
                     onClick = { showDatePicker = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -656,7 +632,6 @@ fun CustomReminderDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Time selection
                 OutlinedButton(
                     onClick = { showTimePicker = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -702,7 +677,6 @@ fun CustomReminderDialog(
         }
     }
 
-    // Date Picker Dialog
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -729,7 +703,6 @@ fun CustomReminderDialog(
         }
     }
 
-    // Time Picker Dialog
     if (showTimePicker) {
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
@@ -767,7 +740,6 @@ private fun formatDateTime(datetime: String?): String {
     }
 }
 
-// Overload for Long timestamp (used by ReminderEntity)
 private fun formatDateTimeLong(timestamp: Long?): String {
     if (timestamp == null) return "Tidak diatur"
     return try {

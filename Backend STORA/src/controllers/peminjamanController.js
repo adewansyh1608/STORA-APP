@@ -3,7 +3,6 @@ const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 
 class PeminjamanController {
-  // Get all peminjaman
   async getAllPeminjaman(req, res) {
     try {
       console.log('===== GET ALL PEMINJAMAN REQUEST =====');
@@ -15,7 +14,6 @@ class PeminjamanController {
 
       let whereClause = {};
 
-      // Filter by user ID - each user only sees their own loans
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
         console.log(`Filtering by user ID: ${req.user.id}`);
@@ -79,17 +77,14 @@ class PeminjamanController {
     }
   }
 
-  // Get peminjaman by ID
   async getPeminjamanById(req, res) {
     try {
       const { id } = req.params;
 
-      // Build where clause including user ownership check
       const whereClause = {
         ID_Peminjaman: id
       };
 
-      // Only allow access to user's own loans
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
@@ -140,7 +135,6 @@ class PeminjamanController {
     }
   }
 
-  // Create new peminjaman
   async createPeminjaman(req, res) {
     const transaction = await sequelize.transaction();
 
@@ -157,10 +151,8 @@ class PeminjamanController {
 
       const { barangList, ...peminjamanData } = req.body;
 
-      // Create peminjaman
       const newPeminjaman = await Peminjaman.create(peminjamanData, { transaction });
 
-      // Create peminjaman barang entries and store created items for photo association
       let createdBarangItems = [];
       if (barangList && barangList.length > 0) {
         const peminjamanBarangData = barangList.map(item => ({
@@ -175,7 +167,6 @@ class PeminjamanController {
         });
       }
 
-      // Handle photo upload if files are present - link to peminjaman_barang items
       if (req.files && req.files.length > 0 && createdBarangItems.length > 0) {
         const photoData = req.files.map((file, index) => ({
           ID_Peminjaman_Barang: createdBarangItems[index % createdBarangItems.length].ID_Peminjaman_Barang,
@@ -184,7 +175,6 @@ class PeminjamanController {
         }));
         await FotoPeminjaman.bulkCreate(photoData, { transaction });
       } else if (req.file && createdBarangItems.length > 0) {
-        // Single file upload - link to first item
         await FotoPeminjaman.create({
           ID_Peminjaman_Barang: createdBarangItems[0].ID_Peminjaman_Barang,
           Foto_Peminjaman: `/uploads/peminjaman/${req.file.filename}`,
@@ -194,7 +184,6 @@ class PeminjamanController {
 
       await transaction.commit();
 
-      // Fetch the complete peminjaman data
       const completePeminjaman = await Peminjaman.findByPk(newPeminjaman.ID_Peminjaman, {
         include: [
           {
@@ -227,7 +216,6 @@ class PeminjamanController {
     }
   }
 
-  // Create new peminjaman with photos (multipart/form-data)
   async createPeminjamanWithPhotos(req, res) {
     const transaction = await sequelize.transaction();
 
@@ -236,7 +224,6 @@ class PeminjamanController {
       console.log('Body:', req.body);
       console.log('Files:', req.files);
 
-      // Parse body data (comes as form-data strings)
       const peminjamanData = {
         Nama_Peminjam: req.body.Nama_Peminjam,
         NoHP_Peminjam: req.body.NoHP_Peminjam,
@@ -246,13 +233,10 @@ class PeminjamanController {
         Status: 'Dipinjam'
       };
 
-      // Parse barangList from JSON string
       const barangList = req.body.barangList ? JSON.parse(req.body.barangList) : [];
 
-      // Create peminjaman
       const newPeminjaman = await Peminjaman.create(peminjamanData, { transaction });
 
-      // Create peminjaman barang entries and store created items
       let createdBarangItems = [];
       if (barangList && barangList.length > 0) {
         const peminjamanBarangData = barangList.map(item => ({
@@ -267,7 +251,6 @@ class PeminjamanController {
         });
       }
 
-      // Handle photo uploads - link to peminjaman_barang items
       if (req.files && req.files.length > 0 && createdBarangItems.length > 0) {
         const photoData = req.files.map((file, index) => ({
           ID_Peminjaman_Barang: createdBarangItems[index % createdBarangItems.length].ID_Peminjaman_Barang,
@@ -280,7 +263,6 @@ class PeminjamanController {
 
       await transaction.commit();
 
-      // Fetch the complete peminjaman data
       const completePeminjaman = await Peminjaman.findByPk(newPeminjaman.ID_Peminjaman, {
         include: [
           {
@@ -316,18 +298,15 @@ class PeminjamanController {
     }
   }
 
-  // Update peminjaman status
   async updatePeminjamanStatus(req, res) {
     try {
       const { id } = req.params;
       const { Status, Tanggal_Dikembalikan, Tanggal_Kembali } = req.body;
 
-      // Build where clause including user ownership check
       const whereClause = {
         ID_Peminjaman: id
       };
 
-      // Only allow update of user's own loans
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
@@ -367,7 +346,6 @@ class PeminjamanController {
     }
   }
 
-  // Update peminjaman (deadline and items)
   async updatePeminjaman(req, res) {
     const transaction = await sequelize.transaction();
 
@@ -380,12 +358,10 @@ class PeminjamanController {
       console.log('New deadline:', Tanggal_Kembali);
       console.log('New items:', barangList);
 
-      // Build where clause including user ownership check
       const whereClause = {
         ID_Peminjaman: id
       };
 
-      // Only allow update of user's own loans
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
@@ -405,7 +381,6 @@ class PeminjamanController {
         });
       }
 
-      // Only allow editing active loans
       if (peminjaman.Status !== 'Dipinjam') {
         await transaction.rollback();
         return res.status(400).json({
@@ -414,20 +389,16 @@ class PeminjamanController {
         });
       }
 
-      // Update deadline if provided
       if (Tanggal_Kembali) {
         await peminjaman.update({ Tanggal_Kembali }, { transaction });
       }
 
-      // Update items if provided
       if (barangList && Array.isArray(barangList)) {
-        // Delete existing items
         await PeminjamanBarang.destroy({
           where: { ID_Peminjaman: id },
           transaction
         });
 
-        // Create new items
         const peminjamanBarangData = barangList.map(item => ({
           ID_Peminjaman: parseInt(id),
           ID_Inventaris: item.ID_Inventaris,
@@ -442,7 +413,6 @@ class PeminjamanController {
 
       await transaction.commit();
 
-      // Fetch updated peminjaman
       const updatedPeminjaman = await Peminjaman.findByPk(id, {
         include: [
           {
@@ -478,7 +448,6 @@ class PeminjamanController {
     }
   }
 
-  // Get peminjaman statistics
   async getPeminjamanStats(req, res) {
     try {
       const totalPeminjaman = await Peminjaman.count();
@@ -515,19 +484,16 @@ class PeminjamanController {
     }
   }
 
-  // Delete peminjaman (and all related data via CASCADE)
   async deletePeminjaman(req, res) {
     const transaction = await sequelize.transaction();
 
     try {
       const { id } = req.params;
 
-      // Build where clause including user ownership check
       const whereClause = {
         ID_Peminjaman: id
       };
 
-      // Only allow deletion of user's own loans
       if (req.user && req.user.id) {
         whereClause.ID_User = req.user.id;
       }
@@ -541,13 +507,11 @@ class PeminjamanController {
         });
       }
 
-      // Delete related peminjaman_barang first (CASCADE should handle this but being explicit)
       await PeminjamanBarang.destroy({
         where: { ID_Peminjaman: id },
         transaction
       });
 
-      // Delete the peminjaman
       await peminjaman.destroy({ transaction });
 
       await transaction.commit();
@@ -565,7 +529,6 @@ class PeminjamanController {
     }
   }
 
-  // Upload return photos for peminjaman items
   async uploadReturnPhotos(req, res) {
     const transaction = await sequelize.transaction();
 
@@ -593,18 +556,13 @@ class PeminjamanController {
         });
       }
 
-      // Process uploaded files
-      // Files are expected to have fieldname like 'photo_0', 'photo_1', etc.
-      // Or via returnPhotos array with ID_Peminjaman_Barang mapping
       if (req.files && req.files.length > 0) {
-        // Parse photoMapping from body if available
         const photoMapping = req.body.photoMapping ? JSON.parse(req.body.photoMapping) : null;
 
         for (let i = 0; i < req.files.length; i++) {
           const file = req.files[i];
           const photoPath = `/uploads/peminjaman/${file.filename}`;
 
-          // Get the ID_Peminjaman_Barang from mapping
           let idPeminjamanBarang = null;
           if (photoMapping && photoMapping[i]) {
             idPeminjamanBarang = photoMapping[i].ID_Peminjaman_Barang;
@@ -613,19 +571,16 @@ class PeminjamanController {
           }
 
           if (idPeminjamanBarang) {
-            // Check if foto_peminjaman entry exists for this item
             const existingFoto = await FotoPeminjaman.findOne({
               where: { ID_Peminjaman_Barang: idPeminjamanBarang },
               transaction
             });
 
             if (existingFoto) {
-              // Update existing entry with return photo
               await existingFoto.update({
                 Foto_Pengembalian: photoPath
               }, { transaction });
             } else {
-              // Create new entry with return photo
               await FotoPeminjaman.create({
                 ID_Peminjaman_Barang: idPeminjamanBarang,
                 Foto_Pengembalian: photoPath,
@@ -638,7 +593,6 @@ class PeminjamanController {
 
       await transaction.commit();
 
-      // Fetch updated peminjaman
       const updatedPeminjaman = await Peminjaman.findByPk(id, {
         include: [{
           association: 'barang',

@@ -73,13 +73,11 @@ const User = sequelize.define(
   }
 );
 
-// Instance method to compare password
 User.prototype.comparePassword = async function (candidatePassword) {
   if (!this.Password) return false;
   return await bcrypt.compare(candidatePassword, this.Password);
 };
 
-// Instance method to hide password in JSON
 User.prototype.toJSON = function () {
   const values = { ...this.get() };
   delete values.Password;

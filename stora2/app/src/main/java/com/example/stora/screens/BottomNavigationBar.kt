@@ -29,29 +29,20 @@ import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 import com.example.stora.ui.theme.StoraYellowButton
 
-/**
- * Komponen Bottom Navigation Bar yang reusable untuk aplikasi STORA
- * 
- * @param navController NavHostController untuk menangani navigasi
- * @param modifier Modifier opsional untuk kustomisasi tampilan
- */
 @Composable
 fun StoraBottomNavigationBar(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
-    // Mendapatkan route saat ini dari back stack
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Menentukan warna background berdasarkan halaman saat ini
     val backgroundColor = if (currentRoute == Routes.INVENTORY_SCREEN) {
         StoraWhite
     } else {
         StoraBlueDark
     }
 
-    // Menentukan warna icon dan text berdasarkan halaman saat ini
     val isOnInventoryScreen = currentRoute == Routes.INVENTORY_SCREEN
     val unselectedIconColor = if (isOnInventoryScreen) Color.Gray else Color.White.copy(alpha = 0.6f)
     val unselectedTextColor = if (isOnInventoryScreen) Color.Gray else Color.White.copy(alpha = 0.6f)
@@ -70,18 +61,14 @@ fun StoraBottomNavigationBar(
             tonalElevation = 0.dp,
             modifier = Modifier.height(96.dp)
         ) {
-            // Item Home
             NavigationBarItem(
                 selected = currentRoute == Routes.HOME_SCREEN,
                 onClick = {
                     navController.navigate(Routes.HOME_SCREEN) {
-                        // Pop up to start destination untuk menghindari back stack menumpuk
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Hindari multiple copies dari destination yang sama
                         launchSingleTop = true
-                        // Restore state saat reselecting item yang sudah dipilih sebelumnya
                         restoreState = true
                     }
                 },
@@ -108,7 +95,6 @@ fun StoraBottomNavigationBar(
                 )
             )
 
-            // Item Inventory
             NavigationBarItem(
                 selected = currentRoute == Routes.INVENTORY_SCREEN,
                 onClick = {
@@ -143,7 +129,6 @@ fun StoraBottomNavigationBar(
                 )
             )
 
-            // Item Loans
             NavigationBarItem(
                 selected = currentRoute == Routes.LOANS_SCREEN,
                 onClick = {

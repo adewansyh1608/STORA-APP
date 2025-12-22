@@ -29,7 +29,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         context = application
     )
     
-    // Network connectivity observer for auto-sync
     private val networkObserver = NetworkConnectivityObserver(application)
     
     private val _isOnline = MutableStateFlow(false)
@@ -61,15 +60,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         updateUnsyncedCount()
         observeNetworkChanges()
         
-        // Auto sync on initialization if online
         if (repository.isOnline()) {
             syncData()
         }
     }
     
-    /**
-     * Observe network connectivity changes and auto-sync when network becomes available
-     */
     private fun observeNetworkChanges() {
         viewModelScope.launch {
             networkObserver.observe().collectLatest { isConnected ->
@@ -78,7 +73,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 
                 Log.d(TAG, "Network status changed: isConnected=$isConnected, wasOffline=$wasOffline")
                 
-                // Auto-sync when coming back online and there are unsynced items
                 if (isConnected && wasOffline) {
                     val unsyncedItems = _unsyncedCount.value
                     if (unsyncedItems > 0) {
@@ -86,7 +80,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         _syncStatus.value = "Kembali online, menyinkronkan $unsyncedItems item..."
                         syncData()
                     } else {
-                        // Still sync from server to get any new data from other devices
                         Log.d(TAG, "Back online, syncing from server to get latest data...")
                         syncFromServer()
                     }
@@ -149,7 +142,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 if (result.isSuccess) {
                     Log.d(TAG, "Item added successfully: ${item.name}")
                     updateUnsyncedCount()
-                    // Try to sync if online
                     if (repository.isOnline()) {
                         syncToServer()
                     }
@@ -178,7 +170,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 if (result.isSuccess) {
                     Log.d(TAG, "Item updated successfully: ${item.name}")
                     updateUnsyncedCount()
-                    // Try to sync if online
                     if (repository.isOnline()) {
                         syncToServer()
                     }
@@ -207,7 +198,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 if (result.isSuccess) {
                     Log.d(TAG, "Item deleted successfully: $id")
                     updateUnsyncedCount()
-                    // Try to sync if online
                     if (repository.isOnline()) {
                         syncToServer()
                     }
@@ -264,7 +254,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 _error.value = "Gagal sinkronisasi: ${e.message}"
             } finally {
                 _isSyncing.value = false
-                // Clear sync status after 3 seconds
                 viewModelScope.launch {
                     kotlinx.coroutines.delay(3000)
                     _syncStatus.value = null

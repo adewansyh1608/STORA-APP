@@ -127,28 +127,24 @@ fun AddItemForm(
     var noinv by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
-    var condition by remember { mutableStateOf("Baik") } // Default value
+    var condition by remember { mutableStateOf("Baik") }
     var location by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showPhotoOptions by remember { mutableStateOf(false) }
-    var showConditionDropdown by remember { mutableStateOf(false) } // For dropdown
+    var showConditionDropdown by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Condition options matching database ENUM
     val conditionOptions = listOf("Baik", "Rusak Ringan", "Rusak Berat")
 
-    // Date picker state
     val calendar = Calendar.getInstance()
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
-    // Camera URI
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Gallery launcher
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -158,7 +154,6 @@ fun AddItemForm(
         }
     }
 
-    // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -170,12 +165,10 @@ fun AddItemForm(
         }
     }
 
-    // Permission request launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Permission granted, launch camera
             val photoFile = File(
                 context.cacheDir,
                 "photo_${System.currentTimeMillis()}.jpg"
@@ -275,14 +268,12 @@ fun AddItemForm(
             label = "Lokasi"
         )
 
-        // Date Picker Field
         StoraDatePickerField(
             value = date,
             label = "Tanggal pencatatan",
             onClick = { showDatePicker = true }
         )
 
-        // Photo Input Section
         PhotoInputSection(
             photoUri = photoUri,
             onPhotoOptionsClick = { showPhotoOptions = true },
@@ -307,7 +298,6 @@ fun AddItemForm(
             )
         }
 
-        // Date Picker Dialog
         if (showDatePicker) {
             val datePickerState = rememberDatePickerState(
                 initialSelectedDateMillis = calendar.timeInMillis
@@ -336,7 +326,6 @@ fun AddItemForm(
             }
         }
 
-        // Photo Options Dialog
         if (showPhotoOptions) {
             PhotoPickerBottomSheet(
                 onDismiss = { showPhotoOptions = false },
@@ -346,13 +335,11 @@ fun AddItemForm(
                 },
                 onCameraClick = {
                     showPhotoOptions = false
-                    // Check camera permission
                     when (PackageManager.PERMISSION_GRANTED) {
                         ContextCompat.checkSelfPermission(
                             context,
                             Manifest.permission.CAMERA
                         ) -> {
-                            // Permission already granted, launch camera
                             val photoFile = File(
                                 context.cacheDir,
                                 "photo_${System.currentTimeMillis()}.jpg"
@@ -365,7 +352,6 @@ fun AddItemForm(
                             cameraLauncher.launch(cameraImageUri!!)
                         }
                         else -> {
-                            // Request permission
                             permissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     }
@@ -377,7 +363,6 @@ fun AddItemForm(
             onClick = {
                 val qtyInt = quantity.toIntOrNull()
                 
-                // Validate all required fields
                 val emptyFields = mutableListOf<String>()
                 if (name.isBlank()) emptyFields.add("Nama Inventaris")
                 if (noinv.isBlank()) emptyFields.add("Nomor Inventaris")
@@ -414,12 +399,9 @@ fun AddItemForm(
                         },
                         onError = { error ->
                             isError = true
-                            // Show backend error message (e.g., duplicate Kode_Barang)
                             errorMessage = error
                         }
                     )
-                    // Note: Don't clear error here - it's an async call
-                    // Error will be cleared when user modifies any field
                 }
             },
             modifier = Modifier
@@ -460,7 +442,6 @@ private fun QuantityInputField(
                 .background(fieldColor),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Minus Button
             IconButton(
                 onClick = {
                     val currentValue = value.toIntOrNull() ?: 0
@@ -478,7 +459,6 @@ private fun QuantityInputField(
                 )
             }
 
-            // Text Field
             BasicTextField(
                 value = value,
                 onValueChange = { newValue ->
@@ -515,7 +495,6 @@ private fun QuantityInputField(
                 }
             )
 
-            // Plus Button
             IconButton(
                 onClick = {
                     val currentValue = value.toIntOrNull() ?: 0

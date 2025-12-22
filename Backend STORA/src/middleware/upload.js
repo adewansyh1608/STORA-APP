@@ -2,7 +2,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure uploads directories exist
 const uploadsDir = path.join(__dirname, '../../public/uploads/inventaris');
 const profileUploadsDir = path.join(__dirname, '../../public/uploads/profiles');
 const peminjamanUploadsDir = path.join(__dirname, '../../public/uploads/peminjaman');
@@ -17,13 +16,11 @@ if (!fs.existsSync(peminjamanUploadsDir)) {
   fs.mkdirSync(peminjamanUploadsDir, { recursive: true });
 }
 
-// Configure storage for inventory
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
-    // Generate unique filename: timestamp-random-originalname
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     const nameWithoutExt = path.basename(file.originalname, ext);
@@ -31,13 +28,11 @@ const storage = multer.diskStorage({
   }
 });
 
-// Configure storage for profile photos
 const profileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, profileUploadsDir);
   },
   filename: function (req, file, cb) {
-    // Generate unique filename with user ID if available
     const userId = req.user?.id || 'unknown';
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname) || '.jpg';
@@ -45,7 +40,6 @@ const profileStorage = multer.diskStorage({
   }
 });
 
-// Configure storage for peminjaman photos
 const peminjamanStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, peminjamanUploadsDir);
@@ -57,7 +51,6 @@ const peminjamanStorage = multer.diskStorage({
   }
 });
 
-// File filter - only accept images
 const fileFilter = (req, file, cb) => {
   console.log('=== FILE UPLOAD DEBUG ===');
   console.log('Original filename:', file.originalname);
@@ -67,10 +60,8 @@ const fileFilter = (req, file, cb) => {
   const allowedExtensions = /\.(jpeg|jpg|png|gif|webp)$/i;
   const allowedMimeTypes = /^image\/(jpeg|jpg|png|gif|webp)$/i;
 
-  // Check file extension
   const hasValidExtension = allowedExtensions.test(file.originalname);
 
-  // Check MIME type - also allow 'image/*' and 'application/octet-stream' from Android
   const hasValidMimetype = allowedMimeTypes.test(file.mimetype) ||
     file.mimetype === 'image/*' ||
     file.mimetype.startsWith('image/') ||
@@ -80,7 +71,6 @@ const fileFilter = (req, file, cb) => {
   console.log('Valid MIME type:', hasValidMimetype);
   console.log('=========================');
 
-  // Accept if either extension OR mimetype is valid (more flexible for Android)
   if (hasValidExtension || hasValidMimetype) {
     return cb(null, true);
   } else {
@@ -89,32 +79,28 @@ const fileFilter = (req, file, cb) => {
 };
 
 
-// Configure multer for inventory
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: fileFilter
 });
 
-// Configure multer for profile photos
 const profileUpload = multer({
   storage: profileStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: fileFilter
 });
 
-// Configure multer for peminjaman photos
 const peminjamanUpload = multer({
   storage: peminjamanStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: fileFilter
 });
 
 module.exports = { upload, profileUpload, peminjamanUpload };
-

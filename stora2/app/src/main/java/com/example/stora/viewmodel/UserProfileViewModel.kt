@@ -23,7 +23,6 @@ class UserProfileViewModel(application: Application) : AndroidViewModel(applicat
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
 
     init {
-        // Load profile from TokenManager on init
         loadProfileFromToken()
     }
 
@@ -54,7 +53,6 @@ class UserProfileViewModel(application: Application) : AndroidViewModel(applicat
             profileImageUri = profileImageUri ?: _userProfile.value.profileImageUri
         )
         
-        // Save foto_profile to TokenManager
         if (profileImageUri != null) {
             tokenManager.saveFotoProfile(profileImageUri.toString())
         }

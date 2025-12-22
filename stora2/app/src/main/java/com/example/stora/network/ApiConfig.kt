@@ -7,13 +7,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiConfig {
-    // Base URL - ganti dengan URL API Anda
-    // Untuk development local: "http://10.0.2.2:3000/api/" (Android Emulator)
-    // Untuk device fisik: "http://YOUR_LOCAL_IP:3000/api/"
-    // Jika error 404, coba ganti ke "http://10.0.2.2:3000/" tanpa /api/
     private const val BASE_URL = "http://10.0.2.2:3000/api/v1/"
     
-    // Server URL for constructing image URLs (without /api/v1/)
     const val SERVER_URL = "http://10.0.2.2:3000"
     
     private const val TAG = "ApiConfig"

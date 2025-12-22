@@ -6,16 +6,14 @@ const password = "";
 const host = "localhost";
 const dbname = "stora_db";
 
-// Create Sequelize instance
 const sequelize = new Sequelize(dbname, username, password, {
   host: host,
   dialect: dialect,
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
-  timezone: '+07:00', // Asia/Jakarta timezone
+  timezone: '+07:00',
   dialectOptions: {
     dateStrings: true,
     typeCast: function (field, next) {
-      // For DATETIME and DATE fields, return as-is (string) to avoid timezone conversion
       if (field.type === 'DATETIME' || field.type === 'DATE') {
         return field.string();
       }
@@ -35,17 +33,14 @@ const sequelize = new Sequelize(dbname, username, password, {
   }
 });
 
-// Test database connection
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
 
-    // Sync models - use force: false to not alter existing tables
     await sequelize.sync({ force: false });
     console.log('📊 Database models synchronized.');
 
-    // Create user_devices table if it doesn't exist (for multi-device notifications)
     try {
       await sequelize.query(`
         CREATE TABLE IF NOT EXISTS user_devices (
@@ -61,10 +56,8 @@ const connectDB = async () => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
     } catch (tableError) {
-      // Table might already exist with constraints, ignore error
     }
 
-    // Add Tanggal_Dikembalikan column to peminjaman table if it doesn't exist
     try {
       const [columns] = await sequelize.query(`
         SELECT COLUMN_NAME 
@@ -82,7 +75,6 @@ const connectDB = async () => {
         `);
       }
     } catch (columnError) {
-      // Column check complete, ignore error
     }
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);

@@ -35,7 +35,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     init {
-        // Check if user already logged in
         checkLoginStatus()
     }
 
@@ -45,7 +44,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 isLoggedIn = true,
                 token = tokenManager.getToken()
             )
-            // Register FCM token for logged-in users on app start
             registerFcmTokenAfterLogin()
         }
     }
@@ -56,7 +54,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
             authRepository.login(email, password)
                 .onSuccess { response ->
-                    // Save token and user data
                     response.token?.let { tokenManager.saveToken(it) }
                     response.data?.let { userData ->
                         tokenManager.saveUserData(
@@ -67,7 +64,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
 
-                    // Register FCM token for push notifications
                     registerFcmTokenAfterLogin()
 
                     _uiState.value = _uiState.value.copy(
@@ -94,7 +90,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
             authRepository.signup(name, email, password, passwordConfirmation)
                 .onSuccess { response ->
-                    // Save token and user data
                     response.token?.let { tokenManager.saveToken(it) }
                     response.data?.let { userData ->
                         tokenManager.saveUserData(
@@ -130,15 +125,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
                 authRepository.logout(currentToken)
                     .onSuccess { response ->
-                        // Clear all saved data
                         tokenManager.clearAll()
 
-                        // Clear Room database (both inventory and loans)
                         viewModelScope.launch {
                             try {
                                 database.inventoryDao().clearAllInventoryItems()
                                 database.loanDao().clearAllLoanData()
-                                // Clear in-memory LoansData
                                 com.example.stora.data.LoansData.clearAll()
                                 android.util.Log.d("AuthViewModel", "Room database (inventory + loans) cleared on logout")
                             } catch (e: Exception) {
@@ -155,15 +147,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     .onFailure { exception ->
-                        // Clear data even if logout API fails
                         tokenManager.clearAll()
 
-                        // Clear Room database (both inventory and loans)
                         viewModelScope.launch {
                             try {
                                 database.inventoryDao().clearAllInventoryItems()
                                 database.loanDao().clearAllLoanData()
-                                // Clear in-memory LoansData
                                 com.example.stora.data.LoansData.clearAll()
                                 android.util.Log.d("AuthViewModel", "Room database cleared on logout (with error)")
                             } catch (e: Exception) {
@@ -180,15 +169,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
             } else {
-                // No token, just clear state
                 tokenManager.clearAll()
 
-                // Clear Room database (both inventory and loans)
                 viewModelScope.launch {
                     try {
                         database.inventoryDao().clearAllInventoryItems()
                         database.loanDao().clearAllLoanData()
-                        // Clear in-memory LoansData
                         com.example.stora.data.LoansData.clearAll()
                         android.util.Log.d("AuthViewModel", "Room database cleared (no token)")
                     } catch (e: Exception) {
@@ -242,7 +228,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
                 authRepository.updateProfile(currentToken, name, email, fotoProfile)
                     .onSuccess { response ->
-                        // Save updated foto_profile to TokenManager
                         if (fotoProfile != null) {
                             tokenManager.saveFotoProfile(fotoProfile)
                         }
@@ -318,7 +303,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
                 authRepository.uploadProfilePhoto(currentToken, photoPart)
                     .onSuccess { response ->
-                        // Save the foto_profile URL from server to TokenManager
                         response.data?.fotoProfile?.let { photoUrl ->
                             tokenManager.saveFotoProfile(photoUrl)
                         }

@@ -2,7 +2,6 @@ package com.example.stora.data
 
 import com.google.gson.annotations.SerializedName
 
-// Response wrapper for notification API
 data class NotificationApiResponse<T>(
     @SerializedName("success")
     val success: Boolean,
@@ -12,14 +11,13 @@ data class NotificationApiResponse<T>(
     val message: String?
 )
 
-// Reminder setting model from API
 data class ReminderApiModel(
     @SerializedName("ID_Reminder")
     val idReminder: Int,
     @SerializedName("ID_User")
     val idUser: Int,
     @SerializedName("reminder_type")
-    val reminderType: String, // "periodic" or "custom"
+    val reminderType: String,
     @SerializedName("title")
     val title: String?,
     @SerializedName("periodic_months")
@@ -38,7 +36,6 @@ data class ReminderApiModel(
     val updatedAt: String?
 )
 
-// Request to create/update reminder
 data class ReminderRequest(
     @SerializedName("reminder_type")
     val reminderType: String,
@@ -54,13 +51,11 @@ data class ReminderRequest(
     val isActive: Boolean? = null
 )
 
-// Request to register FCM token
 data class FcmTokenRequest(
     @SerializedName("fcm_token")
     val fcmToken: String
 )
 
-// Notification history model from database
 data class NotificationHistoryApiModel(
     @SerializedName("ID_Notifikasi")
     val idNotifikasi: Int,

@@ -28,7 +28,6 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // Request notification permission for Android 13+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             val permissionCheck = androidx.core.content.ContextCompat.checkSelfPermission(
                 this,
@@ -42,8 +41,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Schedule periodic reminder check using WorkManager
-        // This runs even when app is closed, allowing offline notifications
         ReminderScheduler.schedulePeriodicCheck(this)
 
         setContent {

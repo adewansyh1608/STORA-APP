@@ -1,10 +1,7 @@
 const { Sequelize } = require('sequelize');
 
-// Database connection function
 const connectDB = async () => {
   try {
-    // You'll need to configure this based on your database setup
-    // Example for MySQL/PostgreSQL:
     const sequelize = new Sequelize(
       process.env.DB_NAME || 'stora_db',
       process.env.DB_USER || 'root',
@@ -23,11 +20,9 @@ const connectDB = async () => {
       }
     );
 
-    // Test the connection
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
 
-    // Sync models (be careful in production)
     if (process.env.NODE_ENV === 'development') {
       await sequelize.sync({ alter: true });
       console.log('📊 Database models synchronized.');

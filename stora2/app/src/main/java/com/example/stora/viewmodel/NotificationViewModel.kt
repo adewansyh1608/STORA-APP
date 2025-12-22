@@ -13,9 +13,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-/**
- * ViewModel for notification/reminder management with offline-first support.
- */
 class NotificationViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
@@ -32,7 +29,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         application
     )
 
-    // State flows
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -45,7 +41,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
     private val _isOnline = MutableStateFlow(repository.isOnline())
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
-    // Live data from Room - automatically updates when data changes
     val reminders: StateFlow<List<ReminderEntity>> = repository.getAllReminders()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -53,7 +48,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
-        // Sync on startup if online
         viewModelScope.launch {
             if (repository.isOnline()) {
                 syncData()
@@ -61,9 +55,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * Create or update periodic reminder - works offline
-     */
     fun savePeriodicReminder(months: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -74,20 +65,17 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                     return@launch
                 }
 
-                // Check if periodic reminder already exists
                 val existingPeriodic = repository.getPeriodicReminder()
 
                 val reminder = if (existingPeriodic != null) {
-                    // Update existing
                     existingPeriodic.copy(
                         periodicMonths = months,
-                        lastNotified = System.currentTimeMillis(), // Reset countdown
+                        lastNotified = System.currentTimeMillis(),
                         needsSync = true,
                         isSynced = false,
                         lastModified = System.currentTimeMillis()
                     )
                 } else {
-                    // Create new
                     ReminderEntity(
                         id = UUID.randomUUID().toString(),
                         userId = userId,
@@ -106,7 +94,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                     Log.d(TAG, "Periodic reminder saved successfully")
                     onSuccess()
 
-                    // Schedule local notification check
                     ReminderScheduler.checkNow(getApplication())
                 } else {
                     val errorMsg = result.exceptionOrNull()?.message ?: "Gagal menyimpan pengingat"
@@ -121,9 +108,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * Create custom reminder - works offline
-     */
     fun saveCustomReminder(
         title: String,
         scheduledDatetime: Long,
@@ -156,7 +140,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                     val savedReminder = result.getOrNull() ?: reminder
                     Log.d(TAG, "Custom reminder saved successfully")
 
-                    // Schedule AlarmManager for exact alarm (works when app is closed)
                     com.example.stora.notification.ReminderAlarmManager.scheduleExactAlarm(
                         context = getApplication(),
                         reminderId = savedReminder.id,
@@ -166,7 +149,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                         scheduledTimeMillis = scheduledDatetime
                     )
 
-                    // Also schedule WorkManager as backup
                     ReminderScheduler.scheduleCustomReminder(
                         getApplication(),
                         savedReminder.id,
@@ -187,15 +169,11 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * Delete a reminder - works offline
-     */
     fun deleteReminder(id: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
                 val result = repository.deleteReminder(id)
                 if (result.isSuccess) {
-                    // Cancel both AlarmManager and WorkManager
                     com.example.stora.notification.ReminderAlarmManager.cancelAlarm(getApplication(), id)
                     ReminderScheduler.cancelCustomReminder(getApplication(), id)
                     onSuccess()
@@ -208,9 +186,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * Toggle reminder active state
-     */
     fun toggleReminder(reminder: ReminderEntity, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -227,9 +202,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * Sync data with server
-     */
     fun syncData() {
         viewModelScope.launch {
             try {
@@ -253,39 +225,26 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                 Log.e(TAG, "Error syncing", e)
                 _syncStatus.value = "Error: ${e.message}"
             } finally {
-                // Clear sync status after delay
                 kotlinx.coroutines.delay(2000)
                 _syncStatus.value = null
             }
         }
     }
 
-    /**
-     * Check network status
-     */
     fun refreshNetworkStatus() {
         _isOnline.value = repository.isOnline()
     }
 
-    /**
-     * Get unread notification count
-     */
     suspend fun getUnreadCount(): Int {
         return repository.getUnreadCount()
     }
 
-    /**
-     * Mark notification as read
-     */
     fun markNotificationAsRead(id: String) {
         viewModelScope.launch {
             repository.markNotificationAsRead(id)
         }
     }
 
-    /**
-     * Mark all as read
-     */
     fun markAllNotificationsAsRead() {
         viewModelScope.launch {
             repository.markAllNotificationsAsRead()

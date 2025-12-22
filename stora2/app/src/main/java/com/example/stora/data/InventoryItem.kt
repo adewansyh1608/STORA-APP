@@ -17,10 +17,10 @@ data class InventoryItem(
     val description: String,
     val date: String,
     val photoUri: String? = null,
-    val serverId: Int? = null, // ID dari backend server
-    val userId: Int = -1, // ID user pemilik item (dari login)
-    val isSynced: Boolean = false, // Status sinkronisasi
-    val isDeleted: Boolean = false, // Soft delete flag
-    val lastModified: Long = System.currentTimeMillis(), // Timestamp terakhir diubah
-    val needsSync: Boolean = false // Flag untuk data yang perlu di-sync
+    val serverId: Int? = null,
+    val userId: Int = -1,
+    val isSynced: Boolean = false,
+    val isDeleted: Boolean = false,
+    val lastModified: Long = System.currentTimeMillis(),
+    val needsSync: Boolean = false
 )

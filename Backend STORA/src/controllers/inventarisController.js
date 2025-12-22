@@ -157,7 +157,6 @@ class InventarisController {
 
       const inventarisData = req.body;
 
-      // Validate required fields
       const requiredFields = ['Nama_Barang', 'Kode_Barang', 'Jumlah', 'Kategori', 'Kondisi'];
       const missingFields = requiredFields.filter(field => !inventarisData[field] || inventarisData[field].toString().trim() === '');
 
@@ -170,21 +169,15 @@ class InventarisController {
         });
       }
 
-      // Normalize Kode_Barang for comparison (case-insensitive, remove leading zeros from number parts)
-      // Example: "HMSI/XX/2025/01" and "hmsi/xx/2025/1" should be treated as the same
       const normalizeKodeBarang = (kode) => {
         if (!kode) return '';
-        // Convert to lowercase and split by common delimiters
         const parts = kode.toString().toLowerCase().split(/[\\/\-_]/);
-        // Remove leading zeros from purely numeric parts
         const normalizedParts = parts.map(part => {
-          // Check if part is purely numeric
           if (/^\d+$/.test(part)) {
-            return parseInt(part, 10).toString(); // Removes leading zeros
+            return parseInt(part, 10).toString();
           }
           return part.trim();
         });
-        // Join back with standard delimiter for comparison
         return normalizedParts.join('/');
       };
 
@@ -192,7 +185,6 @@ class InventarisController {
       const normalizedInputKode = normalizeKodeBarang(kodeBarang);
       console.log(`Checking duplicate for Kode_Barang: "${kodeBarang}" (normalized: "${normalizedInputKode}")`);
 
-      // Get all inventory items for this user and check for normalized duplicates
       const userItems = await Inventaris.findAll({
         where: {
           ID_User: req.user.id
@@ -287,9 +279,7 @@ class InventarisController {
         whereClause.ID_User = req.user.id;
       }
 
-      // Check if Kode_Barang is being updated and if it would create a duplicate
       if (updateData.Kode_Barang) {
-        // Normalize Kode_Barang for comparison (case-insensitive, remove leading zeros)
         const normalizeKodeBarang = (kode) => {
           if (!kode) return '';
           const parts = kode.toString().toLowerCase().split(/[\\/\-_]/);
@@ -306,11 +296,10 @@ class InventarisController {
         const normalizedInputKode = normalizeKodeBarang(kodeBarang);
         console.log(`Checking duplicate for Kode_Barang: "${kodeBarang}" (normalized: "${normalizedInputKode}")`);
 
-        // Get all inventory items for this user EXCLUDING the current item
         const userItems = await Inventaris.findAll({
           where: {
             ID_User: req.user.id,
-            ID_Inventaris: { [Op.ne]: parseInt(id) } // Exclude current item
+            ID_Inventaris: { [Op.ne]: parseInt(id) }
           },
           attributes: ['ID_Inventaris', 'Kode_Barang']
         });
@@ -385,7 +374,6 @@ class InventarisController {
         whereClause.ID_User = req.user.id;
       }
 
-      // First, check if the inventory item exists
       const inventaris = await Inventaris.findOne({
         where: whereClause,
         include: [{
@@ -406,14 +394,12 @@ class InventarisController {
       console.log(`===== DELETE INVENTARIS REQUEST (ID: ${id}) =====`);
       console.log(`Found ${inventaris.foto ? inventaris.foto.length : 0} related photos`);
 
-      // Delete physical photo files from disk
       if (inventaris.foto && inventaris.foto.length > 0) {
         for (const foto of inventaris.foto) {
           if (foto.Foto) {
-            // Construct the file path (remove leading slash if present)
             const relativePath = foto.Foto.startsWith('/') ? foto.Foto.substring(1) : foto.Foto;
             const filePath = path.join(__dirname, '../../', relativePath);
-            
+
             try {
               if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
@@ -423,20 +409,17 @@ class InventarisController {
               }
             } catch (fileError) {
               console.error(`✗ Error deleting photo file ${filePath}:`, fileError.message);
-              // Continue even if file deletion fails
             }
           }
         }
       }
 
-      // Delete related photos from FotoInventaris table
       const deletedPhotosCount = await FotoInventaris.destroy({
         where: { ID_Inventaris: id },
         transaction
       });
       console.log(`✓ Deleted ${deletedPhotosCount} photos from database`);
 
-      // Now delete the inventory item
       await Inventaris.destroy({
         where: whereClause,
         transaction
@@ -461,12 +444,10 @@ class InventarisController {
     }
   }
 
-  // Get borrowed quantity for a specific inventory item
   async getBorrowedQuantity(req, res) {
     try {
       const { id } = req.params;
 
-      // Check if inventory exists and belongs to user
       const whereClause = {
         ID_Inventaris: id
       };
@@ -486,7 +467,6 @@ class InventarisController {
         });
       }
 
-      // Get total borrowed quantity from active loans (status = 'Dipinjam')
       const borrowedQuantity = await PeminjamanBarang.sum('Jumlah', {
         where: {
           ID_Inventaris: id
@@ -566,7 +546,6 @@ class InventarisController {
     }
   }
 
-  // Get sync data - all items for a user (simplified without timestamp columns)
   async getSyncData(req, res) {
     try {
       console.log('===== GET SYNC DATA REQUEST =====');
@@ -584,7 +563,6 @@ class InventarisController {
         ID_User: req.user.id
       };
 
-      // Get all items for this user - the client will handle sync logic
       const items = await Inventaris.findAll({
         where: whereClause,
         order: [['ID_Inventaris', 'DESC']],

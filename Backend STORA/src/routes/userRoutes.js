@@ -4,7 +4,6 @@ const userController = require('../controllers/userController');
 const { body } = require('express-validator');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Validation rules for user creation
 const userValidationRules = [
   body('Nama_User')
     .notEmpty()
@@ -20,7 +19,6 @@ const userValidationRules = [
     .withMessage('Password must be at least 6 characters long')
 ];
 
-// Login validation rules
 const loginValidationRules = [
   body('Email')
     .isEmail()
@@ -31,7 +29,6 @@ const loginValidationRules = [
     .withMessage('Password is required')
 ];
 
-// Routes
 router.get('/', userController.getAllUsers);
 router.get('/:id', userController.getUserById);
 router.post('/', userValidationRules, userController.createUser);

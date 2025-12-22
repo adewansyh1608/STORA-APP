@@ -6,7 +6,6 @@ const logger = (req, res, next) => {
 
   console.log(`[${timestamp}] ${method} ${url} - ${ip}`);
 
-  // Log response
   const originalSend = res.send;
   res.send = function (data) {
     console.log(

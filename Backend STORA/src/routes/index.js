@@ -1,13 +1,11 @@
 const express = require('express');
 const router = express.Router();
 
-// Import route modules
 const authRoutes = require('./authRoutes');
 const inventarisRoutes = require('./inventarisRoutes');
 const peminjamanRoutes = require('./peminjamanRoutes');
 const notificationRoutes = require('./notificationRoutes');
 
-// Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -17,17 +15,12 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Mount auth routes
 router.use('/', authRoutes);
 
-// Mount inventaris routes
 router.use('/inventaris', inventarisRoutes);
 
-// Mount peminjaman routes
 router.use('/peminjaman', peminjamanRoutes);
 
-// Mount notification routes
 router.use('/notifications', notificationRoutes);
 
 module.exports = router;
-

@@ -1,11 +1,10 @@
 const User = require('../models/UserModel');
 
 class UserService {
-  // Get all users with pagination
   async getAllUsers(page = 1, limit = 10, search = '') {
     try {
       const skip = (page - 1) * limit;
-      
+
       let query = {};
       if (search) {
         query = {
@@ -39,7 +38,6 @@ class UserService {
     }
   }
 
-  // Get user by ID
   async getUserById(id) {
     try {
       const user = await User.findById(id).select('-password');
@@ -49,7 +47,6 @@ class UserService {
     }
   }
 
-  // Get user by email
   async getUserByEmail(email) {
     try {
       const user = await User.findOne({ email }).select('+password');
@@ -59,7 +56,6 @@ class UserService {
     }
   }
 
-  // Create new user
   async createUser(userData) {
     try {
       const existingUser = await User.findOne({ email: userData.email });
@@ -69,18 +65,15 @@ class UserService {
 
       const user = new User(userData);
       await user.save();
-      
-      // Return user without password
+
       return await User.findById(user._id).select('-password');
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
     }
   }
 
-  // Update user
   async updateUser(id, updateData) {
     try {
-      // Remove password from update data if present (should be updated separately)
       const { password, ...safeUpdateData } = updateData;
 
       const user = await User.findByIdAndUpdate(
@@ -95,7 +88,6 @@ class UserService {
     }
   }
 
-  // Update user password
   async updatePassword(id, newPassword) {
     try {
       const user = await User.findById(id);
@@ -112,7 +104,6 @@ class UserService {
     }
   }
 
-  // Delete user (soft delete by setting isActive to false)
   async deleteUser(id) {
     try {
       const user = await User.findByIdAndUpdate(
@@ -126,7 +117,6 @@ class UserService {
     }
   }
 
-  // Permanently delete user
   async permanentlyDeleteUser(id) {
     try {
       const user = await User.findByIdAndDelete(id);
@@ -136,7 +126,6 @@ class UserService {
     }
   }
 
-  // Update last login
   async updateLastLogin(id) {
     try {
       await User.findByIdAndUpdate(id, { lastLogin: new Date() });

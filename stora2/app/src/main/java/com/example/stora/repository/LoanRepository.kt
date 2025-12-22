@@ -232,7 +232,7 @@ class LoanRepository(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing date, defaulting to Selesai", e)
-                    "Selesai" // Default to Selesai if date parsing fails
+                    "Selesai"
                 }
 
                 // Update loan status in Room

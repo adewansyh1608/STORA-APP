@@ -52,7 +52,6 @@ fun NewLoanScreen(
 
     val textGray = Color(0xFF585858)
 
-    // Filter items dengan available quantity > 0
     val availableItems = remember(items.size, LoansData.loansOnLoan.size) {
         items.filter { item ->
             LoansData.getAvailableQuantity(item) > 0
@@ -104,7 +103,6 @@ fun NewLoanScreen(
                 .background(StoraBlueDark)
                 .padding(top = 24.dp)
         ) {
-            // White content area with rounded top corners only
             androidx.compose.animation.AnimatedVisibility(
                 visible = isVisible,
                 enter = slideInVertically(animationSpec = tween(800, delayMillis = 200)) { it } + fadeIn(animationSpec = tween(800, delayMillis = 200)),
@@ -121,7 +119,6 @@ fun NewLoanScreen(
                         .padding(horizontal = 24.dp)
                         .padding(top = 32.dp)
                 ) {
-                    // Search Bar
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -152,7 +149,6 @@ fun NewLoanScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Divider untuk mempertegas batas
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth(),
                         thickness = 1.dp,
@@ -161,7 +157,6 @@ fun NewLoanScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Content
                     if (availableItems.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -210,7 +205,6 @@ fun NewLoanScreen(
                                 }
                             }
 
-                            // Button Pinjam
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = selectedItems.isNotEmpty(),
                                 enter = slideInVertically(
@@ -278,7 +272,6 @@ fun NewLoanItemCard(
         border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, StoraBlueDark) else null
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            // Left colored bar
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -286,7 +279,6 @@ fun NewLoanItemCard(
                     .background(if (isSelected) StoraBlueDark else StoraYellow)
             )
 
-            // Content
             Column(
                 modifier = Modifier
                     .padding(12.dp)

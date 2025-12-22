@@ -13,7 +13,6 @@ object NetworkTest {
     fun testBackendConnection() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Test koneksi ke backend
                 val url = URL("http://10.0.2.2:3000/api/login")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"

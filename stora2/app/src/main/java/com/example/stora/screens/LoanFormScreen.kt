@@ -69,7 +69,6 @@ fun LoanFormScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isLoading by loanViewModel.isLoading.collectAsState()
 
-    // Form states
     var borrowerName by remember { mutableStateOf("") }
     var borrowerPhone by remember { mutableStateOf("") }
     var borrowDate by remember { mutableStateOf("") }
@@ -84,7 +83,6 @@ fun LoanFormScreen(
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
 
-    // Selected items with quantities
     val loanItems = remember(inventoryItems, selectedItemIds) {
         mutableStateListOf<LoanFormItem>().apply {
             selectedItemIds.forEach { id ->
@@ -100,7 +98,6 @@ fun LoanFormScreen(
 
     val textGray = Color(0xFF585858)
 
-    // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -112,7 +109,6 @@ fun LoanFormScreen(
         selectedItemForPhoto = null
     }
 
-    // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -126,7 +122,6 @@ fun LoanFormScreen(
         }
     }
 
-    // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -202,7 +197,6 @@ fun LoanFormScreen(
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
 
-                    // Selected Items with Quantity Controls
                     Text(
                         text = "Barang yang Dipinjam",
                         fontSize = 14.sp,
@@ -226,7 +220,6 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Borrower Name
                     Text(
                         text = "Nama Peminjam",
                         fontSize = 14.sp,
@@ -251,7 +244,6 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Phone Number
                     Text(
                         text = "Nomor HP Peminjam",
                         fontSize = 14.sp,
@@ -284,7 +276,6 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Borrow Date and Time Section
                     Text(
                         text = "Tanggal & Jam Peminjaman",
                         fontSize = 14.sp,
@@ -297,7 +288,6 @@ fun LoanFormScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Borrow Date
                         OutlinedTextField(
                             value = borrowDate,
                             onValueChange = {},
@@ -322,7 +312,6 @@ fun LoanFormScreen(
                             )
                         )
                         
-                        // Borrow Time
                         OutlinedTextField(
                             value = borrowTime,
                             onValueChange = {},
@@ -350,7 +339,6 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Return Date and Time Section (Deadline)
                     Text(
                         text = "Tanggal & Jam Deadline Pengembalian",
                         fontSize = 14.sp,
@@ -363,7 +351,6 @@ fun LoanFormScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Return Date
                         OutlinedTextField(
                             value = returnDate,
                             onValueChange = {},
@@ -388,7 +375,6 @@ fun LoanFormScreen(
                             )
                         )
                         
-                        // Return Time
                         OutlinedTextField(
                             value = returnTime,
                             onValueChange = {},
@@ -416,9 +402,7 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Show photo upload section based on number of items
                     if (loanItems.size == 1) {
-                        // Single item: show photo only for that item
                         val loanItem = loanItems[0]
                         val index = 0
 
@@ -475,7 +459,6 @@ fun LoanFormScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
                     } else if (loanItems.size >= 2) {
-                        // Multiple items: show photo for each item
                         Text(
                             text = "Foto Barang yang Dipinjam",
                             fontSize = 14.sp,
@@ -544,14 +527,11 @@ fun LoanFormScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Save Button
                     Button(
                         onClick = {
-                            // Combine date and time
                             val fullBorrowDateTime = "$borrowDate $borrowTime"
                             val fullReturnDateTime = "$returnDate $returnTime"
                             
-                            // Prepare LoanItemInfo list for Room storage with individual images
                             val loanItemInfos = loanItems.map { loanFormItem ->
                                 LoanItemInfo(
                                     inventarisId = loanFormItem.inventoryItem.serverId ?: 0,
@@ -562,7 +542,6 @@ fun LoanFormScreen(
                                 )
                             }
 
-                            // Save to Room and sync to server via ViewModel
                             loanViewModel.createLoan(
                                 namaPeminjam = borrowerName,
                                 noHpPeminjam = borrowerPhone,
@@ -570,9 +549,6 @@ fun LoanFormScreen(
                                 tanggalKembali = fullReturnDateTime,
                                 items = loanItemInfos,
                                 onSuccess = {
-                                    // ViewModel already syncs Room data to LoansData automatically
-                                    // No need to manually add to LoansData here
-                                    // Navigate back to loans screen
                                     navController.popBackStack(com.example.stora.navigation.Routes.LOANS_SCREEN, false)
                                 },
                                 onError = { error ->
@@ -616,7 +592,6 @@ fun LoanFormScreen(
         }
     }
 
-    // Image Picker Dialog
     if (selectedItemForPhoto != null) {
         LoanImagePickerDialog(
             onDismiss = { selectedItemForPhoto = null },
@@ -629,7 +604,6 @@ fun LoanFormScreen(
         )
     }
 
-    // Date Pickers
     if (showBorrowDatePicker) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -688,7 +662,6 @@ fun LoanFormScreen(
         }
     }
 
-    // Time Pickers
     if (showBorrowTimePicker) {
         val timePickerState = rememberTimePickerState(
             initialHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY),
@@ -778,7 +751,6 @@ fun LoanItemQuantityCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left bar
             Box(
                 modifier = Modifier
                     .width(4.dp)
@@ -788,7 +760,6 @@ fun LoanItemQuantityCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Item info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = loanFormItem.inventoryItem.name,
@@ -810,7 +781,6 @@ fun LoanItemQuantityCard(
                 )
             }
 
-            // Quantity controls
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -886,7 +856,6 @@ private fun LoanImagePickerDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Gallery Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -921,7 +890,6 @@ private fun LoanImagePickerDialog(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Camera Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

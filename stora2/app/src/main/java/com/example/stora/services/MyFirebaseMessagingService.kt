@@ -47,24 +47,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         
         Log.d(TAG, "Title: $title, Body: $body, Type: $type, ReminderId: $reminderId")
         
-        // Handle reminder notifications with deduplication
         if (type == "custom_reminder" && reminderId != null) {
             handleReminderNotification(title, body, reminderId, reminderTimestamp)
         } else if (type in listOf("loan_deadline_warning", "loan_deadline", "loan_overdue")) {
-            // Handle loan notifications
             val loanId = remoteMessage.data["loan_id"]
             val loanTimestamp = remoteMessage.data["loan_timestamp"]?.toLongOrNull()
             handleLoanNotification(title, body, type, loanId, loanTimestamp)
         } else {
-            // Non-reminder notification - show directly
             showNotification(title, body, type)
         }
     }
     
-    /**
-     * Handle loan notification with deduplication check.
-     * If offline notification already shown for this loan type, replace it with online version.
-     */
     private fun handleLoanNotification(
         title: String,
         body: String,
@@ -84,7 +77,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     return@launch
                 }
                 
-                // Calculate start and end of today for deduplication
                 val timestamp = loanTimestamp ?: System.currentTimeMillis()
                 val calendar = Calendar.getInstance()
                 calendar.timeInMillis = timestamp
@@ -97,20 +89,16 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 calendar.add(Calendar.DAY_OF_MONTH, 1)
                 val endOfDay = calendar.timeInMillis
                 
-                // Check if notification already exists by title+message today (handles loan notifications)
                 val existingNotification = database.notificationHistoryDao()
                     .getNotificationByTitleMessageAndDate(userId, title, body, startOfDay, endOfDay)
                 
                 if (existingNotification != null) {
                     Log.d(TAG, "⏭ Loan notification already exists (offline was shown)")
                     
-                    // If existing notification was local (offline), delete it and insert online version
                     if (existingNotification.isLocallyCreated) {
-                        // Delete the offline version
                         database.notificationHistoryDao().deleteNotification(existingNotification.id)
                         Log.d(TAG, "🗑 Deleted offline loan notification: ${existingNotification.id}")
                         
-                        // Insert new online version (not locally created, already synced)
                         val onlineNotification = NotificationHistoryEntity(
                             id = java.util.UUID.randomUUID().toString(),
                             title = title,
@@ -121,7 +109,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                             serverId = null,
                             relatedReminderId = loanId,
                             serverReminderId = loanId?.toIntOrNull(),
-                            isLocallyCreated = false, // Came from FCM - online
+                            isLocallyCreated = false,
                             isSynced = true,
                             needsSync = false,
                             lastModified = System.currentTimeMillis()
@@ -130,15 +118,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                         Log.d(TAG, "✓ Replaced offline with online loan notification")
                     }
                     
-                    // DO NOT show notification again - offline version was already shown
                     return@launch
                 }
                 
-                // No existing notification - show it
                 Log.d(TAG, "🔔 First loan notification for type $type - showing")
                 showNotification(title, body, type)
                 
-                // Save to Room database
                 val notification = NotificationHistoryEntity(
                     id = java.util.UUID.randomUUID().toString(),
                     title = title,
@@ -149,7 +134,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     serverId = null,
                     relatedReminderId = loanId,
                     serverReminderId = loanId?.toIntOrNull(),
-                    isLocallyCreated = false, // Came from FCM
+                    isLocallyCreated = false,
                     isSynced = true,
                     needsSync = false,
                     lastModified = System.currentTimeMillis()
@@ -160,16 +145,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling loan notification", e)
-                // Fallback: show notification anyway
                 showNotification(title, body, type)
             }
         }
     }
     
-    /**
-     * Handle reminder notification with deduplication check.
-     * If offline notification already shown for this reminder, replace it with online version.
-     */
     private fun handleReminderNotification(
         title: String, 
         body: String, 
@@ -188,7 +168,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     return@launch
                 }
                 
-                // Calculate start and end of today for deduplication
                 val timestamp = reminderTimestamp ?: System.currentTimeMillis()
                 val calendar = Calendar.getInstance()
                 calendar.timeInMillis = timestamp
@@ -201,20 +180,16 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 calendar.add(Calendar.DAY_OF_MONTH, 1)
                 val endOfDay = calendar.timeInMillis
                 
-                // Check if notification already exists for this reminder today
                 val existingNotification = database.notificationHistoryDao()
                     .getNotificationByReminderAndDate(userId, reminderId, startOfDay, endOfDay)
                 
                 if (existingNotification != null) {
                     Log.d(TAG, "⏭ Notification already exists for reminder $reminderId (offline notification was shown)")
                     
-                    // If existing notification was local (offline), delete it and insert online version
                     if (existingNotification.isLocallyCreated) {
-                        // Delete the offline version
                         database.notificationHistoryDao().deleteNotification(existingNotification.id)
                         Log.d(TAG, "🗑 Deleted offline reminder notification: ${existingNotification.id}")
                         
-                        // Insert new online version (not locally created, already synced)
                         val onlineNotification = NotificationHistoryEntity(
                             id = java.util.UUID.randomUUID().toString(),
                             title = title,
@@ -225,7 +200,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                             serverId = null,
                             relatedReminderId = reminderId,
                             serverReminderId = reminderId.toIntOrNull(),
-                            isLocallyCreated = false, // Came from FCM - online
+                            isLocallyCreated = false,
                             isSynced = true,
                             needsSync = false,
                             lastModified = System.currentTimeMillis()
@@ -234,17 +209,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                         Log.d(TAG, "✓ Replaced offline with online reminder notification")
                     }
                     
-                    // DO NOT show notification again - offline version was already shown
                     return@launch
                 }
                 
-                // No existing notification - this is the first notification for this reminder
                 Log.d(TAG, "🔔 First notification for reminder $reminderId - showing")
                 
-                // Show the notification
                 showNotification(title, body, "custom_reminder")
                 
-                // Save to Room database
                 val serverReminderId = reminderId.toIntOrNull()
                 val notification = NotificationHistoryEntity(
                     id = java.util.UUID.randomUUID().toString(),
@@ -256,7 +227,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     serverId = null,
                     relatedReminderId = reminderId,
                     serverReminderId = serverReminderId,
-                    isLocallyCreated = false, // Not locally created - came from server
+                    isLocallyCreated = false,
                     needsSync = false,
                     isSynced = true,
                     lastModified = System.currentTimeMillis()
@@ -267,7 +238,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling reminder notification", e)
-                // Fallback: show notification anyway
                 showNotification(title, body, "custom_reminder")
             }
         }
@@ -277,7 +247,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         super.onNewToken(token)
         Log.d(TAG, "Refreshed FCM token: $token")
         
-        // Save the token to SharedPreferences for later use
         getSharedPreferences("fcm_prefs", Context.MODE_PRIVATE)
             .edit()
             .putString("fcm_token", token)
@@ -287,7 +256,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     private fun showNotification(title: String, body: String, type: String = "reminder") {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Create notification channel for Android O and above
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -297,7 +265,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 description = "Notifikasi pengingat pengecekan inventory"
                 enableVibration(true)
                 enableLights(true)
-                // Enable default notification sound
                 setSound(
                     android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
                     android.media.AudioAttributes.Builder()
@@ -309,7 +276,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        // Create intent to open app when notification is tapped
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("notification_type", type)
@@ -322,7 +288,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Build notification
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
@@ -332,10 +297,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVibrate(longArrayOf(0, 500, 200, 500))
-            .setDefaults(NotificationCompat.DEFAULT_SOUND) // Add default sound
+            .setDefaults(NotificationCompat.DEFAULT_SOUND)
             .build()
 
-        // Show notification with unique ID based on current time
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
         Log.d(TAG, "✓ Notification shown: $title")
     }

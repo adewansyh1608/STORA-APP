@@ -55,7 +55,6 @@ fun InventoryScreen(
     val textGray = Color(0xFF585858)
     val dividerYellow = Color(0xFFEFBF6A)
 
-    // Show snackbar for errors
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(error) {
@@ -68,7 +67,6 @@ fun InventoryScreen(
         }
     }
 
-    // Show snackbar for sync status
     LaunchedEffect(syncStatus) {
         syncStatus?.let {
             snackbarHostState.showSnackbar(
@@ -78,7 +76,6 @@ fun InventoryScreen(
         }
     }
 
-    // Filter items based on search
     val filteredItems = remember(searchQuery, items) {
         if (searchQuery.isBlank()) {
             items
@@ -96,7 +93,6 @@ fun InventoryScreen(
             SnackbarHost(
                 hostState = snackbarHostState,
                 snackbar = { snackbarData ->
-                    // Determine snackbar type based on message content
                     val isSuccess = snackbarData.visuals.message.contains("berhasil", ignoreCase = true) ||
                             snackbarData.visuals.message.contains("success", ignoreCase = true) ||
                             snackbarData.visuals.message.contains("sync", ignoreCase = true)
@@ -105,9 +101,9 @@ fun InventoryScreen(
                             snackbarData.visuals.message.contains("failed", ignoreCase = true)
                     
                     val backgroundColor = when {
-                        isSuccess -> Color(0xFF00C853) // Bright Green
-                        isError -> Color(0xFFE53935) // Red
-                        else -> Color(0xFF1976D2) // Blue for info
+                        isSuccess -> Color(0xFF00C853)
+                        isError -> Color(0xFFE53935)
+                        else -> Color(0xFF1976D2)
                     }
                     
                     val icon = when {
@@ -154,7 +150,6 @@ fun InventoryScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Sync button with badge
                 if (unsyncedCount > 0) {
                     BadgedBox(
                         badge = {
@@ -205,7 +200,6 @@ fun InventoryScreen(
                     }
                 }
 
-                // Add item button
                 FloatingActionButton(
                     onClick = { navController.navigate(Routes.ADD_ITEM_SCREEN) },
                     containerColor = StoraYellow,
@@ -227,7 +221,6 @@ fun InventoryScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Title with sync status
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,12 +235,10 @@ fun InventoryScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Online/Offline indicator and Bell icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Online/Offline indicator
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -265,7 +256,6 @@ fun InventoryScreen(
                         )
                     }
                     
-                    // Bell icon for notification settings
                     IconButton(
                         onClick = { navController.navigate(Routes.REMINDER_SETTINGS_SCREEN) },
                         modifier = Modifier.size(32.dp)
@@ -280,7 +270,6 @@ fun InventoryScreen(
                 }
             }
 
-            // Search bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -310,7 +299,6 @@ fun InventoryScreen(
                 color = dividerYellow
             )
 
-            // Empty state
             if (items.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -359,7 +347,6 @@ fun InventoryScreen(
                     )
                 }
             } else {
-                // Items list
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -402,14 +389,13 @@ fun InventoryItemCard(item: InventoryItem, onClick: () -> Unit) {
             colors = CardDefaults.cardColors(containerColor = StoraWhite)
         ) {
             Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                // Left colored bar with sync indicator
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(16.dp)
                         .background(
                             if (!item.isSynced || item.needsSync) {
-                                Color(0xFFFF9800) // Orange for unsynced
+                                Color(0xFFFF9800)
                             } else {
                                 StoraYellow
                             }
@@ -435,7 +421,6 @@ fun InventoryItemCard(item: InventoryItem, onClick: () -> Unit) {
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Sync status icon
                         if (!item.isSynced || item.needsSync) {
                             Icon(
                                 imageVector = Icons.Filled.CloudOff,
@@ -473,7 +458,6 @@ fun InventoryItemCard(item: InventoryItem, onClick: () -> Unit) {
                             )
                         }
 
-                        // Category badge
                         Surface(
                             shape = RoundedCornerShape(4.dp),
                             color = StoraYellow.copy(alpha = 0.2f)

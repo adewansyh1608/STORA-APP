@@ -18,10 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-/**
- * BroadcastReceiver for handling loan deadline alarms when the app is closed.
- * Similar to ReminderAlarmReceiver but for loan notifications.
- */
 class LoanAlarmReceiver : BroadcastReceiver() {
     
     companion object {
@@ -29,17 +25,15 @@ class LoanAlarmReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "loan_deadline_channel"
         const val CHANNEL_NAME = "Pengingat Peminjaman"
         
-        // Intent extras
         const val EXTRA_LOAN_ID = "loan_id"
         const val EXTRA_LOAN_SERVER_ID = "loan_server_id"
         const val EXTRA_BORROWER_NAME = "borrower_name"
-        const val EXTRA_NOTIFICATION_TYPE = "notification_type" // warning, deadline, overdue
+        const val EXTRA_NOTIFICATION_TYPE = "notification_type"
         const val EXTRA_SCHEDULED_TIME = "scheduled_time"
         
-        // Notification types
-        const val TYPE_WARNING = "warning"   // 1 hour before
-        const val TYPE_DEADLINE = "deadline" // at deadline
-        const val TYPE_OVERDUE = "overdue"   // 1 hour after
+        const val TYPE_WARNING = "warning"
+        const val TYPE_DEADLINE = "deadline"
+        const val TYPE_OVERDUE = "overdue"
     }
     
     override fun onReceive(context: Context, intent: Intent) {
@@ -53,7 +47,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
         
         Log.d(TAG, "Loan ID: $loanId, Type: $notificationType, Borrower: $borrowerName")
         
-        // Generate notification message based on type
         val (title, message) = when (notificationType) {
             TYPE_WARNING -> "Pengingat Peminjaman" to "Peminjaman \"$borrowerName\" akan deadline dalam 1 jam"
             TYPE_DEADLINE -> "Pengingat Peminjaman" to "Peminjaman \"$borrowerName\" sudah mencapai batas waktu pengembalian"
@@ -61,10 +54,8 @@ class LoanAlarmReceiver : BroadcastReceiver() {
             else -> "Pengingat Peminjaman" to "Deadline peminjaman \"$borrowerName\""
         }
         
-        // Always show notification when alarm fires (offline support)
         showNotification(context, loanId, title, message, notificationType)
         
-        // Save to Room database
         saveNotificationToDatabase(context, loanId, loanServerId, title, message, notificationType)
     }
     
@@ -77,7 +68,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
-        // Create notification channel for Android O+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -90,7 +80,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
         
-        // Create intent to open app
         val contentIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("navigate_to", "loan_detail")
@@ -104,7 +93,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Build notification
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -116,7 +104,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
         
-        // Use unique ID based on loan ID and notification type
         val notificationId = (loanId.hashCode() + notificationType.hashCode()) and 0x7FFFFFFF
         notificationManager.notify(notificationId, notification)
         
@@ -136,7 +123,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
                 val database = AppDatabase.getDatabase(context)
                 val historyDao = database.notificationHistoryDao()
                 
-                // Get user ID from shared preferences
                 val sharedPrefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                 val userId = sharedPrefs.getInt("user_id", -1)
                 
@@ -147,8 +133,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
                 
                 val currentTime = System.currentTimeMillis()
                 
-                // Check for existing notification to avoid duplicates
-                // Use title + message + today as deduplication key
                 val calendar = Calendar.getInstance()
                 calendar.set(Calendar.HOUR_OF_DAY, 0)
                 calendar.set(Calendar.MINUTE, 0)
@@ -158,7 +142,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
                 calendar.add(Calendar.DAY_OF_MONTH, 1)
                 val endOfDay = calendar.timeInMillis
                 
-                // Check if notification already exists for this loan + type + today
                 val existing = historyDao.getNotificationByTitleMessageAndDate(
                     userId, title, message, startOfDay, endOfDay
                 )
@@ -168,7 +151,6 @@ class LoanAlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // Create notification history entry
                 val notification = NotificationHistoryEntity(
                     id = java.util.UUID.randomUUID().toString(),
                     title = title,
@@ -177,7 +159,7 @@ class LoanAlarmReceiver : BroadcastReceiver() {
                     status = "Terkirim",
                     userId = userId,
                     serverId = null,
-                    relatedReminderId = loanId, // Use loan ID as reference
+                    relatedReminderId = loanId,
                     serverReminderId = if (loanServerId != -1) loanServerId else null,
                     isLocallyCreated = true,
                     isSynced = false,

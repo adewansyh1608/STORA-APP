@@ -2,7 +2,6 @@ package com.example.stora.data
 
 import com.google.gson.annotations.SerializedName
 
-// Request models
 data class LoginRequest(
     @SerializedName("email")
     val email: String,
@@ -39,7 +38,6 @@ data class ResetPasswordRequest(
     val confirmPassword: String
 )
 
-// Response models
 data class AuthResponse(
     @SerializedName("success")
     val success: Boolean,
@@ -68,7 +66,6 @@ data class UserData(
     val updatedAt: String
 )
 
-// Error response model
 data class ErrorResponse(
     @SerializedName("success")
     val success: Boolean,

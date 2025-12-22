@@ -5,7 +5,6 @@ const { body } = require('express-validator');
 const authMiddleware = require('../middleware/authMiddleware');
 const { profileUpload } = require('../middleware/upload');
 
-// Validation rules for signup
 const signupValidationRules = [
   body('name')
     .notEmpty()
@@ -24,7 +23,6 @@ const signupValidationRules = [
     .withMessage('Password confirmation is required')
 ];
 
-// Validation rules for login
 const loginValidationRules = [
   body('email')
     .isEmail()
@@ -35,7 +33,6 @@ const loginValidationRules = [
     .withMessage('Password is required')
 ];
 
-// Validation rules for profile update
 const profileUpdateValidationRules = [
   body('name')
     .optional()
@@ -48,7 +45,6 @@ const profileUpdateValidationRules = [
     .normalizeEmail()
 ];
 
-// Validation rules for reset password
 const resetPasswordValidationRules = [
   body('email')
     .isEmail()
@@ -62,7 +58,6 @@ const resetPasswordValidationRules = [
     .withMessage('Confirm password is required')
 ];
 
-// Auth routes
 router.post('/signup', signupValidationRules, authController.signup);
 router.post('/login', loginValidationRules, authController.login);
 router.post('/logout', authMiddleware, authController.logout);
@@ -70,8 +65,6 @@ router.post('/reset-password', resetPasswordValidationRules, authController.rese
 router.get('/profile', authMiddleware, authController.getProfile);
 router.put('/profile', authMiddleware, profileUpdateValidationRules, authController.updateProfile);
 
-// Profile photo upload route
 router.post('/profile/photo', authMiddleware, profileUpload.single('photo'), authController.uploadProfilePhoto);
 
 module.exports = router;
-

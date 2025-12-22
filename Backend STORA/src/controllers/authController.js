@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 
 class AuthController {
-  // Register/Signup
   async signup(req, res) {
     try {
       const errors = validationResult(req);
@@ -25,7 +24,6 @@ class AuthController {
 
       const { name, email, password, password_confirmation } = req.body;
 
-      // Check if passwords match
       if (password !== password_confirmation) {
         return res.status(400).json({
           success: false,
@@ -36,7 +34,6 @@ class AuthController {
         });
       }
 
-      // Check if user already exists
       const existingUser = await User.findOne({ where: { Email: email } });
       if (existingUser) {
         return res.status(400).json({
@@ -48,14 +45,12 @@ class AuthController {
         });
       }
 
-      // Create new user
       const newUser = await User.create({
         Nama_User: name,
         Email: email,
         Password: password
       });
 
-      // Generate JWT token
       const token = jwt.sign(
         {
           id: newUser.ID_User,
@@ -88,7 +83,6 @@ class AuthController {
     }
   }
 
-  // Login
   async login(req, res) {
     try {
       const errors = validationResult(req);
@@ -108,7 +102,6 @@ class AuthController {
 
       const { email, password } = req.body;
 
-      // Find user by email
       const user = await User.findOne({
         where: { Email: email },
         attributes: ['ID_User', 'Nama_User', 'Email', 'Password', 'Foto_Profile']
@@ -123,7 +116,6 @@ class AuthController {
         });
       }
 
-      // Check password
       const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
         return res.status(401).json({
@@ -134,10 +126,8 @@ class AuthController {
         });
       }
 
-      // Update login status
       await user.update({ isLoggedIn: true });
 
-      // Generate JWT token
       const token = jwt.sign(
         {
           id: user.ID_User,
@@ -172,10 +162,8 @@ class AuthController {
     }
   }
 
-  // Logout
   async logout(req, res) {
     try {
-      // Get user from token (assuming middleware sets req.user)
       if (req.user) {
         await User.update(
           { isLoggedIn: false },
@@ -200,7 +188,6 @@ class AuthController {
     }
   }
 
-  // Get current user profile
   async getProfile(req, res) {
     try {
       const user = await User.findByPk(req.user.id, {
@@ -241,7 +228,6 @@ class AuthController {
     }
   }
 
-  // Update profile
   async updateProfile(req, res) {
     try {
       const errors = validationResult(req);
@@ -262,7 +248,6 @@ class AuthController {
       const { name, email, foto_profile } = req.body;
       const userId = req.user.id;
 
-      // Check if email is already taken by another user
       if (email) {
         const existingUser = await User.findOne({
           where: {
@@ -282,7 +267,6 @@ class AuthController {
         }
       }
 
-      // Update user
       const updateData = {};
       if (name) updateData.Nama_User = name;
       if (email) updateData.Email = email;
@@ -292,7 +276,6 @@ class AuthController {
         where: { ID_User: userId }
       });
 
-      // Get updated user
       const updatedUser = await User.findByPk(userId, {
         attributes: ['ID_User', 'Nama_User', 'Email', 'Foto_Profile']
       });
@@ -322,7 +305,6 @@ class AuthController {
     }
   }
 
-  // Upload profile photo
   async uploadProfilePhoto(req, res) {
     try {
       if (!req.file) {
@@ -335,17 +317,14 @@ class AuthController {
 
       const userId = req.user.id;
 
-      // Construct the URL for the uploaded file
       const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
       const photoUrl = `${baseUrl}/uploads/profiles/${req.file.filename}`;
 
-      // Update user's foto_profile in database
       await User.update(
         { Foto_Profile: photoUrl },
         { where: { ID_User: userId } }
       );
 
-      // Get updated user
       const updatedUser = await User.findByPk(userId, {
         attributes: ['ID_User', 'Nama_User', 'Email', 'Foto_Profile']
       });
@@ -371,7 +350,6 @@ class AuthController {
     }
   }
 
-  // Reset password (forgot password)
   async resetPassword(req, res) {
     try {
       const errors = validationResult(req);
@@ -391,7 +369,6 @@ class AuthController {
 
       const { email, new_password, confirm_password } = req.body;
 
-      // Check if passwords match
       if (new_password !== confirm_password) {
         return res.status(400).json({
           success: false,
@@ -402,7 +379,6 @@ class AuthController {
         });
       }
 
-      // Find user by email
       const user = await User.findOne({ where: { Email: email } });
       if (!user) {
         return res.status(404).json({
@@ -414,8 +390,6 @@ class AuthController {
         });
       }
 
-      // Update password - pass PLAIN password, Sequelize hook will hash it
-      // The beforeUpdate hook in User model handles password hashing
       await user.update({ Password: new_password });
 
       res.status(200).json({
@@ -435,4 +409,3 @@ class AuthController {
 }
 
 module.exports = new AuthController();
-

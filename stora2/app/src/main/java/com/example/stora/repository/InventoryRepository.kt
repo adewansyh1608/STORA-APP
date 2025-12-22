@@ -90,7 +90,7 @@ class InventoryRepository(
                 "png" -> "image/png"
                 "gif" -> "image/gif"
                 "webp" -> "image/webp"
-                else -> "image/jpeg" // Default to jpeg
+                else -> "image/jpeg"
             }
             
             Log.d(TAG, "Creating photo part: ${file.name}, MIME: $mimeType")
@@ -421,7 +421,7 @@ class InventoryRepository(
                                 if (existingItem != null && existingItem.needsSync) {
                                     Log.d(TAG, "⏭ Skipping server update for ${apiModel.namaBarang} - local changes pending")
                                     skippedCount++
-                                    return@forEach  // Continue to next item
+                                    return@forEach
                                 }
 
                                 val localItem = if (existingItem != null) {

@@ -21,9 +21,6 @@ import androidx.compose.ui.unit.sp
 import com.example.stora.ui.theme.StoraBlueDark
 import com.example.stora.ui.theme.StoraWhite
 
-/**
- * Enum untuk jenis snackbar
- */
 enum class StoraSnackbarType {
     SUCCESS,
     ERROR,
@@ -32,9 +29,6 @@ enum class StoraSnackbarType {
     SYNC
 }
 
-/**
- * Data class untuk konfigurasi snackbar
- */
 data class StoraSnackbarConfig(
     val type: StoraSnackbarType,
     val backgroundColor: Color,
@@ -42,42 +36,36 @@ data class StoraSnackbarConfig(
     val iconTint: Color = StoraWhite
 )
 
-/**
- * Mendapatkan konfigurasi berdasarkan tipe snackbar
- */
 fun getSnackbarConfig(type: StoraSnackbarType): StoraSnackbarConfig {
     return when (type) {
         StoraSnackbarType.SUCCESS -> StoraSnackbarConfig(
             type = type,
-            backgroundColor = Color(0xFF00C853), // Bright Green
+            backgroundColor = Color(0xFF00C853),
             icon = Icons.Filled.CheckCircle
         )
         StoraSnackbarType.ERROR -> StoraSnackbarConfig(
             type = type,
-            backgroundColor = Color(0xFFE53935), // Red
+            backgroundColor = Color(0xFFE53935),
             icon = Icons.Filled.Error
         )
         StoraSnackbarType.INFO -> StoraSnackbarConfig(
             type = type,
-            backgroundColor = Color(0xFF2196F3), // Blue
+            backgroundColor = Color(0xFF2196F3),
             icon = Icons.Filled.Info
         )
         StoraSnackbarType.WARNING -> StoraSnackbarConfig(
             type = type,
-            backgroundColor = Color(0xFFFF9800), // Orange
+            backgroundColor = Color(0xFFFF9800),
             icon = Icons.Filled.Warning
         )
         StoraSnackbarType.SYNC -> StoraSnackbarConfig(
             type = type,
-            backgroundColor = Color(0xFF1976D2), // Dark Blue
+            backgroundColor = Color(0xFF1976D2),
             icon = Icons.Filled.Sync
         )
     }
 }
 
-/**
- * Custom Snackbar dengan desain modern dan profesional
- */
 @Composable
 fun StoraSnackbar(
     snackbarData: SnackbarData,
@@ -101,7 +89,6 @@ fun StoraSnackbar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Icon
             Icon(
                 imageVector = config.icon,
                 contentDescription = null,
@@ -109,7 +96,6 @@ fun StoraSnackbar(
                 modifier = Modifier.size(24.dp)
             )
             
-            // Message
             Text(
                 text = snackbarData.visuals.message,
                 color = StoraWhite,
@@ -118,7 +104,6 @@ fun StoraSnackbar(
                 modifier = Modifier.weight(1f)
             )
             
-            // Dismiss action if available
             snackbarData.visuals.actionLabel?.let { actionLabel ->
                 TextButton(
                     onClick = { snackbarData.performAction() },
@@ -137,9 +122,6 @@ fun StoraSnackbar(
     }
 }
 
-/**
- * Custom SnackbarHost dengan styling konsisten
- */
 @Composable
 fun StoraSnackbarHost(
     hostState: SnackbarHostState,
@@ -158,9 +140,6 @@ fun StoraSnackbarHost(
     )
 }
 
-/**
- * Sync success snackbar khusus untuk sinkronisasi
- */
 @Composable
 fun SyncSnackbar(
     snackbarData: SnackbarData,
@@ -188,7 +167,6 @@ fun SyncSnackbar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Animated icon
             Icon(
                 imageVector = if (isSuccess) Icons.Filled.CloudDone else Icons.Filled.CloudOff,
                 contentDescription = null,
@@ -196,7 +174,6 @@ fun SyncSnackbar(
                 modifier = Modifier.size(24.dp)
             )
             
-            // Message
             Text(
                 text = snackbarData.visuals.message,
                 color = StoraWhite,

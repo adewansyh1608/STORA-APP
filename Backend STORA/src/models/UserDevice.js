@@ -1,10 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../../config/db');
 
-/**
- * UserDevice model - stores multiple FCM tokens per user
- * Each device that logs in gets its own entry
- */
 const UserDevice = sequelize.define(
     'UserDevice',
     {
@@ -48,8 +44,6 @@ const UserDevice = sequelize.define(
     {
         tableName: 'user_devices',
         timestamps: false,
-        // Note: Cannot add unique index on TEXT field (FCM_Token)
-        // Handle uniqueness in application logic instead
     }
 );
 

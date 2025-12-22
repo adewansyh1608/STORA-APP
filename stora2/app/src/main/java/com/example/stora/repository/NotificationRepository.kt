@@ -219,7 +219,7 @@ class NotificationRepository(
                     // FIXED: Use lastNotified if exists, otherwise use lastModified (creation time)
                     // This prevents new reminders from immediately firing
                     val baseline = reminder.lastNotified ?: reminder.lastModified
-                    val intervalMs = months * 30L * 24 * 60 * 60 * 1000 // Approximate
+                    val intervalMs = months * 30L * 24 * 60 * 60 * 1000
                     val isDue = (currentTime - baseline) >= intervalMs
                     
                     Log.d(TAG, "Periodic reminder ${reminder.title}: baseline=${baseline}, interval=${intervalMs}ms, isDue=$isDue")
@@ -527,7 +527,7 @@ class NotificationRepository(
                             // Use new fromApiModel that preserves local data when server returns null
                             val reminderEntity = ReminderEntity.fromApiModel(
                                 serverReminder,
-                                existingLocal,  // Pass existing local entity to preserve datetime
+                                existingLocal,
                                 userId
                             )
                             reminderDao.insertReminder(reminderEntity)

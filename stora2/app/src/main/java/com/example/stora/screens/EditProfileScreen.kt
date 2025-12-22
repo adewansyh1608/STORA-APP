@@ -62,7 +62,6 @@ fun EditProfileScreen(
     var isUploading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -71,7 +70,6 @@ fun EditProfileScreen(
         }
     }
 
-    // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -80,7 +78,6 @@ fun EditProfileScreen(
         }
     }
 
-    // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -93,13 +90,11 @@ fun EditProfileScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Reload profile from TokenManager to get latest data
         viewModel.loadProfileFromToken()
         delay(100)
         isVisible = true
     }
     
-    // Update local state when viewModel profile changes
     LaunchedEffect(userProfile) {
         name = userProfile.name
         selectedImageUri = userProfile.profileImageUri
@@ -113,7 +108,6 @@ fun EditProfileScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
             TopAppBar(
                 title = {
                     Text(
@@ -140,13 +134,11 @@ fun EditProfileScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // White Card Container with overlapping avatar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // White Card with Animation
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isVisible,
                     enter = slideInVertically(animationSpec = tween(800, delayMillis = 200)) { it } + fadeIn(animationSpec = tween(800, delayMillis = 200)),
@@ -167,10 +159,8 @@ fun EditProfileScreen(
                             .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Space for avatar overlap
                         Spacer(modifier = Modifier.height(90.dp))
 
-                        // Form Fields
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
@@ -187,7 +177,6 @@ fun EditProfileScreen(
 
                         Button(
                             onClick = {
-                                // Upload photo to backend if a new image was selected
                                 selectedImageUri?.let { uri ->
                                     val file = FileUtils.getFileFromUri(context, uri)
                                     if (file != null) {
@@ -198,7 +187,6 @@ fun EditProfileScreen(
                                         authViewModel.uploadProfilePhoto(
                                             photoPart = photoPart,
                                             onSuccess = { photoUrl ->
-                                                // Update local profile with server URL
                                                 viewModel.updateProfile(
                                                     name = name,
                                                     email = null,
@@ -211,7 +199,6 @@ fun EditProfileScreen(
                                             },
                                             onError = { error ->
                                                 isUploading = false
-                                                // Still update local
                                                 viewModel.updateProfile(
                                                     name = name,
                                                     email = null,
@@ -223,12 +210,10 @@ fun EditProfileScreen(
                                             }
                                         )
                                     } else {
-                                        // No file, just update name
                                         authViewModel.updateProfile(name = name, email = null, fotoProfile = null)
                                         navController.popBackStack()
                                     }
                                 } ?: run {
-                                    // No image selected, just update name
                                     authViewModel.updateProfile(name = name, email = null, fotoProfile = null)
                                     navController.popBackStack()
                                 }
@@ -254,7 +239,6 @@ fun EditProfileScreen(
                     }
                 }
 
-                // Profile Avatar with Camera Icon - positioned to overlap
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -288,7 +272,6 @@ fun EditProfileScreen(
                             }
                         }
 
-                        // Camera Icon Badge
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -309,7 +292,6 @@ fun EditProfileScreen(
             }
         }
 
-        // Image Picker Dialog
         if (showImagePickerDialog) {
             ImagePickerDialog(
                 onDismiss = { showImagePickerDialog = false },
@@ -355,7 +337,6 @@ private fun ImagePickerDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Gallery Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -390,7 +371,6 @@ private fun ImagePickerDialog(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Camera Option
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

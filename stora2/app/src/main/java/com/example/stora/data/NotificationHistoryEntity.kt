@@ -4,72 +4,36 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.util.UUID
 
-/**
- * Room entity to store notification history locally for offline access.
- * Records all notifications sent to the user (both from server and local).
- */
 @Entity(tableName = "notification_history")
 data class NotificationHistoryEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
-    
-    /** Server ID (null if created locally/offline and not yet synced) */
     val serverId: Int? = null,
-    
-    /** Server Reminder ID for deduplication (maps to ID_Reminder in backend) */
     val serverReminderId: Int? = null,
-    
-    /** User ID who received this notification */
     val userId: Int,
-    
-    /** Notification title */
     val title: String,
-    
-    /** Notification message/body */
     val message: String,
-    
-    /** When the notification was sent (timestamp in milliseconds) */
     val timestamp: Long = System.currentTimeMillis(),
-    
-    /** Status: "Terkirim", "read", "pending" - standardized to Indonesian */
     val status: String = "Terkirim",
-    
-    /** Related loan ID if this is a loan reminder notification */
     val relatedLoanId: Int? = null,
-    
-    /** Related reminder ID (local Room ID) if this was triggered by a reminder */
     val relatedReminderId: String? = null,
-    
-    /** Whether this notification was created locally (offline) */
     val isLocallyCreated: Boolean = false,
-    
-    /** Whether this notification has local changes that need to sync to server */
     val needsSync: Boolean = false,
-    
-    /** Whether this notification is synced with server */
     val isSynced: Boolean = true,
-    
-    /** Last modification timestamp */
     val lastModified: Long = System.currentTimeMillis()
 ) {
     companion object {
-        /**
-         * Create from API response
-         */
         fun fromApiModel(apiModel: NotificationHistoryApiModel, localId: String? = null, userId: Int): NotificationHistoryEntity {
             val timestamp = apiModel.tanggal?.let {
                 try {
-                    // Try parsing as ISO datetime first (e.g., "2025-12-20T03:59:00.000Z")
                     val isoFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
                     isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
                     isoFormat.parse(it.replace(".000Z", ""))?.time
                         ?: run {
-                            // Fallback to date-only format
                             java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(it)?.time
                                 ?: System.currentTimeMillis()
                         }
                 } catch (e: Exception) {
-                    // Try timestamp format
                     try {
                         it.toLongOrNull() ?: System.currentTimeMillis()
                     } catch (e2: Exception) {
@@ -87,7 +51,6 @@ data class NotificationHistoryEntity(
                 message = apiModel.pesan ?: "",
                 timestamp = timestamp,
                 status = apiModel.status?.let { 
-                    // Standardize status to "Terkirim"
                     if (it.equals("sent", ignoreCase = true)) "Terkirim" else it 
                 } ?: "Terkirim",
                 relatedLoanId = apiModel.idPeminjaman,
@@ -98,9 +61,6 @@ data class NotificationHistoryEntity(
             )
         }
         
-        /**
-         * Create a local notification record (for offline notifications)
-         */
         fun createLocal(
             userId: Int,
             title: String,
@@ -118,7 +78,7 @@ data class NotificationHistoryEntity(
                 title = title,
                 message = message,
                 timestamp = timestamp,
-                status = "Terkirim", // Standardized status
+                status = "Terkirim",
                 relatedLoanId = relatedLoanId,
                 relatedReminderId = relatedReminderId,
                 isLocallyCreated = true,

@@ -6,8 +6,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface LoanDao {
     
-    // ==================== LOAN QUERIES ====================
-    
     @Query("SELECT * FROM loans WHERE userId = :userId AND status NOT IN ('Selesai', 'Terlambat') AND isDeleted = 0 ORDER BY lastModified DESC")
     fun getActiveLoans(userId: Int): Flow<List<LoanEntity>>
     
@@ -23,7 +21,6 @@ interface LoanDao {
     @Query("SELECT * FROM loans WHERE serverId = :serverId")
     suspend fun getLoanByServerId(serverId: Int): LoanEntity?
 
-    // Get loans that are synced (have serverId) for cleanup during sync
     @Query("SELECT * FROM loans WHERE userId = :userId AND serverId IS NOT NULL AND isDeleted = 0")
     suspend fun getSyncedLoansWithServerId(userId: Int): List<LoanEntity>
 
@@ -33,15 +30,12 @@ interface LoanDao {
     @Query("SELECT COUNT(*) FROM loans WHERE userId = :userId AND needsSync = 1")
     suspend fun getUnsyncedLoanCount(userId: Int): Int
 
-    // Get deleted loans that need to be synced to server
     @Query("SELECT * FROM loans WHERE userId = :userId AND isDeleted = 1 AND serverId IS NOT NULL")
     suspend fun getDeletedLoansToSync(userId: Int): List<LoanEntity>
     
-    // Soft delete a loan (mark as deleted for sync later)
     @Query("UPDATE loans SET isDeleted = 1, needsSync = 1, lastModified = :lastModified WHERE id = :loanId")
     suspend fun softDeleteLoan(loanId: String, lastModified: Long)
     
-    // Update loan deadline and mark for sync
     @Query("UPDATE loans SET tanggalKembali = :deadline, needsSync = 1, lastModified = :lastModified WHERE id = :loanId")
     suspend fun updateLoanDeadline(loanId: String, deadline: String, lastModified: Long)
     
@@ -63,8 +57,6 @@ interface LoanDao {
     @Query("UPDATE loans SET status = :status, tanggalDikembalikan = :returnDate, needsSync = 1, lastModified = :lastModified WHERE id = :loanId")
     suspend fun updateLoanStatus(loanId: String, status: String, returnDate: String?, lastModified: Long)
 
-    // ==================== LOAN ITEM QUERIES ====================
-    
     @Query("SELECT * FROM loan_items WHERE loanId = :loanId")
     suspend fun getLoanItems(loanId: String): List<LoanItemEntity>
     
@@ -95,8 +87,6 @@ interface LoanDao {
     @Query("UPDATE loan_items SET jumlah = :quantity WHERE id = :itemId")
     suspend fun updateLoanItemQuantity(itemId: String, quantity: Int)
 
-    // ==================== COMBINED QUERIES ====================
-    
     @Transaction
     suspend fun insertLoanWithItems(loan: LoanEntity, items: List<LoanItemEntity>) {
         insertLoan(loan)
@@ -109,7 +99,6 @@ interface LoanDao {
         getLoanById(loanId)?.let { deleteLoan(it) }
     }
 
-    // Get borrowed quantity for an item (active loans only)
     @Query("""
         SELECT COALESCE(SUM(li.jumlah), 0) 
         FROM loan_items li 
@@ -119,8 +108,6 @@ interface LoanDao {
     """)
     suspend fun getBorrowedQuantity(itemCode: String): Int
 
-    // ==================== CLEAR ALL DATA ====================
-    
     @Query("DELETE FROM loans")
     suspend fun clearAllLoans()
     

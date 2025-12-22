@@ -5,7 +5,6 @@ const { body } = require('express-validator');
 const authMiddleware = require('../middleware/authMiddleware');
 const { peminjamanUpload } = require('../middleware/upload');
 
-// Validation rules for peminjaman creation
 const peminjamanValidationRules = [
   body('Nama_Peminjam')
     .notEmpty()
@@ -33,27 +32,20 @@ const peminjamanValidationRules = [
     .withMessage('Jumlah must be at least 1')
 ];
 
-// Status update validation
 const statusValidationRules = [
   body('Status')
     .isIn(['Menunggu', 'Dipinjam', 'Selesai', 'Terlambat', 'Ditolak'])
     .withMessage('Status must be one of: Menunggu, Dipinjam, Selesai, Terlambat, Ditolak')
 ];
 
-// Routes
 router.get('/', authMiddleware, peminjamanController.getAllPeminjaman);
 router.get('/stats', authMiddleware, peminjamanController.getPeminjamanStats);
 router.get('/:id', authMiddleware, peminjamanController.getPeminjamanById);
-// JSON-only route for peminjaman without photos
 router.post('/', authMiddleware, peminjamanValidationRules, peminjamanController.createPeminjaman);
-// Multipart route for peminjaman with photos
 router.post('/with-photos', authMiddleware, peminjamanUpload.array('photos', 10), peminjamanController.createPeminjamanWithPhotos);
 router.patch('/:id/status', authMiddleware, statusValidationRules, peminjamanController.updatePeminjamanStatus);
-// Upload return photos for a peminjaman
 router.patch('/:id/return-photos', authMiddleware, peminjamanUpload.array('photos', 10), peminjamanController.uploadReturnPhotos);
-// Update peminjaman (deadline and items)
 router.put('/:id', authMiddleware, peminjamanController.updatePeminjaman);
-// Delete peminjaman
 router.delete('/:id', authMiddleware, peminjamanController.deletePeminjaman);
 
 module.exports = router;
